@@ -1,0 +1,13 @@
+.vscode
+.pytest_cache
+__pycache__
+.VSCodeCounter
+selenium_parser
+test
+logging_config.json
+custom.py
+decorator.py
+exercise_1.py
+exercise_2.py
+OOP.py
+venv

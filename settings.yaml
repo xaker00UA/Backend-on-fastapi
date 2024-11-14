@@ -1,0 +1,87 @@
+---
+# This YAML file use placeholders:
+# format: <key_name>
+#
+# Example:
+#   srv_id: "server_id: <id>"
+#
+# This YAML file is loaded by the Python library dynamic-yaml,
+# which allows you to use variables in the file
+#
+# Example:
+# server:
+#   port: 8080
+#
+# message:
+#   server_running: 'server started on port {server.port}'
+
+bot_name: "Blitz Statistics"
+
+server:
+  host: "127.0.0.1"
+  port: "8000"
+  protocol: "http"
+
+session:
+  ttl: 3_888_000 # in seconds - 45 days
+
+autosession:
+  ttl: 3_888_000 # in seconds - 45 days
+
+session_widget:
+  url: "{server.protocol}://{server.host}:{server.port}/bot/ui/session_widget_app?p_id=<user_id>&lang=<lang>&slot_n=<slot>"
+
+auth:
+  wg_redirect_uri: "{server.protocol}://{server.host}:{server.port}/bot/auth/game?region=<region>&requested_by=<requested_by>&slot_n=<slot>"
+  wg_uri: "https://api.worldoftanks.<region>/wot/auth/login/?application_id=<app_id>&redirect_uri=<redirect_uri>&display=popup"
+
+  ds_auth_redirect_url: "{server.protocol}://{server.host}:{server.port}/bot/auth/discord"
+  ds_auth_primary_uri: "https://discord.com/oauth2/authorize?client_id=<client_id>&response_type=code&redirect_uri=<redirect_uri>&scope=identify"
+
+game_api:
+  reg_urls:
+    eu: "eu"
+    na: "com"
+    asia: "asia"
+
+  urls:
+    get_id: "https://api.wotblitz.<reg_url>/wotb/account/list/\
+      ?application_id=<app_id>\
+      &search=<nickname>\
+      &type=<search_type>"
+    search: "https://api.wotblitz.<reg_url>/wotb/account/list/\
+      ?application_id=<app_id\
+      &search=<nickname>\
+      &type=<search_type>\
+      &limit=<limit>"
+    get_stats: "https://api.wotblitz.<reg_url>/wotb/account/info/\
+      ?application_id=<app_id>\
+      &account_id=<player_id>\
+      &extra=statistics.rating\
+      &fields=-statistics.clan\
+      &access_token=<access_token>"
+    get_achievements:
+      "https://api.wotblitz.<reg_url>/wotb/account/achievements/\
+      ?application_id=<app_id>\
+      &account_id=<player_id>"
+
+    get_clan_stats: "https://api.wotblitz.<reg_url>/wotb/clans/accountinfo/\
+      ?application_id=<app_id>\
+      &account_id=<player_id>\
+      &extra=clan"
+
+    get_tank_stats: "https://api.wotblitz.<reg_url>/wotb/tanks/stats/\
+      ?application_id=<app_id>\
+      &account_id=<player_id>\
+      &access_token=<access_token>"
+
+    get_token: "https://api.worldoftanks.<reg_url>/wot/auth/login/\
+      ?application_id=<app_id>\
+      &redirect_uri=https://a6dd-91-215-146-199.ngrok-free.app/auth\
+      &nofollow=1"
+
+    get_position_rating: "https://<reg_url>.wotblitz.com/uk/api/rating-leaderboards/user/<player_id>"
+
+    logout: "https://api.worldoftanks.<reg_url>/wot/auth/logout/\
+      ?application_id=<app_id>\
+      &access_token=<token>"
