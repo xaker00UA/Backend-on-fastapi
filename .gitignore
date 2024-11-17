@@ -4,6 +4,7 @@ __pycache__
 .VSCodeCounter
 selenium_parser
 test
+test.py
 logging_config.json
 custom.py
 decorator.py

@@ -1,12 +1,12 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 import asyncio
-
+import os
 
 from ..models import User, Tank
 
 
 class Connect:
-    client = AsyncIOMotorClient("mongodb://localhost:27017")
+    client = AsyncIOMotorClient(os.getenv("MONGO", "mongodb://localhost:27017/"))
     db = client.test_db
 
     @classmethod
