@@ -77,7 +77,7 @@ game_api:
 
     get_token: "https://api.worldoftanks.<reg_url>/wot/auth/login/\
       ?application_id=<app_id>\
-      &redirect_uri=https://a6dd-91-215-146-199.ngrok-free.app/auth\
+      &redirect_uri=<redirect_url>\
       &nofollow=1"
 
     get_position_rating: "https://<reg_url>.wotblitz.com/uk/api/rating-leaderboards/user/<player_id>"
@@ -85,3 +85,11 @@ game_api:
     logout: "https://api.worldoftanks.<reg_url>/wot/auth/logout/\
       ?application_id=<app_id>\
       &access_token=<token>"
+
+    search_clan: "https://api.wotblitz.<reg_url>/wotb/clans/list/\
+      ?application_id=<app_id>\
+      &search=<name>"
+
+    get_clan_info: "https://api.wotblitz.<reg_url>/wotb/clans/info/\
+      ?application_id=<app_id>\
+      &clan_id=<clan_id>"

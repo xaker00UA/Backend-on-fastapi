@@ -1,8 +1,13 @@
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
-import asyncio
+from typing import AsyncGenerator
+from motor.motor_asyncio import (
+    AsyncIOMotorClient,
+    AsyncIOMotorCollection,
+    AsyncIOMotorCursor,
+)
 import os
 
 from ..models import User, Tank
+from ..models.clan import ClanDB
 
 
 class Connect:
@@ -68,14 +73,93 @@ class Player_sessions(Connect):
         ).to_list(length=10)
         return [User.model_validate(doc) for doc in res]
 
+    @classmethod
+    async def find_all(cls) -> AsyncGenerator[list, None]:
+        cursor: AsyncIOMotorCursor = cls.collection.find()
+        batch_size = 100
+
+        while True:
+            batch = await cursor.to_list(length=batch_size)
+            if not batch:
+                break
+            yield [User.model_validate(doc) for doc in batch]
+
 
 class Clan_sessions(Connect):
     collection: AsyncIOMotorCollection = Connect.db["Clan"]
 
     @classmethod
-    async def get(cls, id: int):
-        res = await cls.collection.find_one(filter={"clan_id": id})
-        return res
+    async def get(cls, name: str, clan_id, region) -> ClanDB:
+        filter_conditions = []
+
+        if clan_id and region:
+            filter_conditions.append({"clan_id": clan_id, "region": region})
+
+        if name:
+            filter_conditions.append(
+                {"name": {"$regex": f"^{name}$", "$options": "i"}, "region": region}
+            )
+            filter_conditions.append(
+                {
+                    "tag": {"$regex": f"^{name.upper()}$", "$options": "i"},
+                    "region": region,
+                }
+            )
+
+        # Объединяем условия с оператором "$or"
+        filter = {"$or": filter_conditions}
+        res = await cls.collection.find_one(filter=filter)
+        if res:
+            return ClanDB(**res)
+
+    @classmethod
+    async def add(cls, clan: ClanDB) -> ClanDB:
+        await cls.collection.replace_one(
+            filter={"clan_id": clan.clan_id},
+            replacement=clan.model_dump(),
+            upsert=True,
+        )
+        return clan
+
+    @classmethod
+    async def gets(cls, name) -> list[ClanDB]:
+        filter_conditions = [
+            {"name": {"$regex": name, "$options": "i"}},
+            {"tag": {"$regex": name, "$options": "i"}},
+        ]
+        res = await cls.collection.find(
+            filter={"$or": filter_conditions},
+        ).to_list(length=10)
+        return [ClanDB.model_validate(doc) for doc in res]
+
+    @classmethod
+    async def find_all(cls) -> AsyncGenerator[list, None]:
+        cursor: AsyncIOMotorCursor = cls.collection.find()
+        batch_size = 100
+
+        while True:
+            batch = await cursor.to_list(length=batch_size)
+            if not batch:
+                break
+            yield [ClanDB.model_validate(doc) for doc in batch]
+
+
+class Player_all_sessions(Player_sessions):
+    collection: AsyncIOMotorCollection = Connect.db["Session_all"]
+
+    @classmethod
+    async def add(cls, user: User) -> User:
+        await cls.collection.insert_one(user.model_dump())
+        return user
+
+
+class Clan_all_sessions(Clan_sessions):
+    collection: AsyncIOMotorCollection = Connect.db["Clan_all"]
+
+    @classmethod
+    async def add(cls, clan: ClanDB) -> ClanDB:
+        await cls.collection.insert_one(clan.model_dump())
+        return clan
 
 
 class Tank_DB(Connect):

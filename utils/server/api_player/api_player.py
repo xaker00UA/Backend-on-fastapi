@@ -10,9 +10,9 @@ from fastapi.datastructures import URL
 
 from ..api_socket import player_router_socket
 from ..auth import require_authentication
-from ...api.wotb import APIServer
+
 from ...interfase.player import PlayerSession
-from ...models import User, RestPlayer, PlayerGeneral, PlayerDetails
+from ...models import User
 from ...error import PlayerNotFound, NotFoundPlayerDB
 
 

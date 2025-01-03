@@ -50,6 +50,8 @@ class Urls(BaseModel, StrMixin):
     get_token: str
     get_position_rating: str
     logout: str
+    search_clan: str
+    get_clan_info: str
 
 
 class GameApi(BaseModel, StrMixin):

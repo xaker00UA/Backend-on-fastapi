@@ -8,29 +8,45 @@ from ..api.wotb import APIServer
 from ..models import User
 from .auth import router as auth_router
 from .api_player import router as player_router, stats as player_stats
+from .api_clan.api_clan import router as clan_router
 from .api_socket import player_router_socket
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from ..interfase.player import PlayerSession
+from ..interfase.clan import ClanInterface
+from logging.handlers import RotatingFileHandler
+
+handler = RotatingFileHandler(
+    "app.log", encoding="utf-8", maxBytes=10 * 1024 * 1024, backupCount=5
+)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+
+logger = logging.getLogger()
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
-    trigger = CronTrigger(hour=16, minute=24, second=30)
+    trigger = CronTrigger(hour=22, minute=48, second=20)
+    trigger_clan = CronTrigger(week=1, day_of_week="fri", hour=00, minute=27)
     scheduler.add_job(PlayerSession.update_db, trigger=trigger)
-
+    scheduler.add_job(ClanInterface.update_db, trigger=trigger_clan)
+    print("Starting the scheduler...")
     scheduler.start()
     yield
     print("Waiting for the database update to complete before shutting down...")
-    scheduler.shutdown(wait=False)  # Ожидаем завершения всех задач
+    scheduler.shutdown(wait=True)  # Ожидаем завершения всех задач
 
 
 app = FastAPI(title="Authentication", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(player_router)
 app.include_router(player_stats)
+app.include_router(clan_router)
 # app.include_router(player_router_socket)
 
 origins = [

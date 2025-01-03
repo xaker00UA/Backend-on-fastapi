@@ -1,0 +1,47 @@
+2025-01-02 23:43:37,743 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-01-02 23:43:37,744 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-01-02 23:43:37,746 - apscheduler.scheduler - INFO - Added job "PlayerSession.update_db" to job store "default"
+2025-01-02 23:43:37,749 - apscheduler.scheduler - INFO - Added job "ClanInterface.update_db" to job store "default"
+2025-01-02 23:43:37,749 - apscheduler.scheduler - INFO - Scheduler started
+2025-01-02 23:43:38,935 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-01-02 23:43:47,047 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-01-02 23:43:47,047 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-01-02 23:43:47,049 - apscheduler.scheduler - INFO - Added job "PlayerSession.update_db" to job store "default"
+2025-01-02 23:43:47,050 - apscheduler.scheduler - INFO - Added job "ClanInterface.update_db" to job store "default"
+2025-01-02 23:43:47,050 - apscheduler.scheduler - INFO - Scheduler started
+2025-01-02 23:44:00,022 - apscheduler.executors.default - INFO - Running job "ClanInterface.update_db (trigger: cron[week='1', day_of_week='thu', hour='23', minute='44'], next run at: 2026-01-01 23:44:00 EET)" (scheduled at 2025-01-02 23:44:00+02:00)
+2025-01-02 23:44:00,022 - root - INFO - Start update clan db
+2025-01-02 23:44:00,298 - apscheduler.executors.default - ERROR - Job "ClanInterface.update_db (trigger: cron[week='1', day_of_week='thu', hour='23', minute='44'], next run at: 2026-01-01 23:44:00 EET)" raised an exception
+Traceback (most recent call last):
+  File "d:\Mem\test\venv\Lib\site-packages\apscheduler\executors\base_py3.py", line 30, in run_coroutine_job
+    retval = await job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\Mem\test\utils\interfase\clan.py", line 76, in update_db
+    clan = await cls(
+           ^^^^^^^^^^
+  File "d:\Mem\test\utils\interfase\clan.py", line 41, in get_clan_details
+    res = await self._get_clan_details()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\Mem\test\utils\interfase\clan.py", line 31, in _get_clan_details
+    res = await self.session.get_clan_details(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\Mem\test\utils\api\wotb.py", line 317, in get_clan_details
+    return ClanDetails(**data["data"][str(clan.clan_id)])
+                                          ^^^^
+UnboundLocalError: cannot access local variable 'clan' where it is not associated with a value
+2025-01-03 00:25:55,107 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-01-03 00:26:03,656 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-01-03 00:26:03,656 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-01-03 00:26:03,658 - apscheduler.scheduler - INFO - Added job "PlayerSession.update_db" to job store "default"
+2025-01-03 00:26:03,662 - apscheduler.scheduler - INFO - Added job "ClanInterface.update_db" to job store "default"
+2025-01-03 00:26:03,662 - apscheduler.scheduler - INFO - Scheduler started
+2025-01-03 00:26:09,176 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2025-01-03 00:26:17,270 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-01-03 00:26:17,270 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-01-03 00:26:17,272 - apscheduler.scheduler - INFO - Added job "PlayerSession.update_db" to job store "default"
+2025-01-03 00:26:17,272 - apscheduler.scheduler - INFO - Added job "ClanInterface.update_db" to job store "default"
+2025-01-03 00:26:17,272 - apscheduler.scheduler - INFO - Scheduler started
+2025-01-03 00:27:00,016 - apscheduler.executors.default - INFO - Running job "ClanInterface.update_db (trigger: cron[week='1', day_of_week='fri', hour='0', minute='27'], next run at: 2026-01-02 00:27:00 EET)" (scheduled at 2025-01-03 00:27:00+02:00)
+2025-01-03 00:27:00,017 - root - INFO - Start update clan db
+2025-01-03 00:27:19,696 - root - INFO - End update clan db
+2025-01-03 00:27:19,696 - apscheduler.executors.default - INFO - Job "ClanInterface.update_db (trigger: cron[week='1', day_of_week='fri', hour='0', minute='27'], next run at: 2026-01-02 00:27:00 EET)" executed successfully

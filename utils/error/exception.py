@@ -1,30 +1,44 @@
-class ValidError(Exception):
+class BaseCustomException(Exception):
     pass
 
 
-class PlayerNotFound(Exception):
+class ValidError(BaseCustomException):
     pass
 
 
-class ClanNotFound(Exception):
+class PlayerNotFound(BaseCustomException):
     pass
 
 
-class RequestError(Exception):
+class ClanNotFound(BaseCustomException):
+    def __init__(self, clan_name: str):
+        # Формируем сообщение об ошибке, включая имя клана
+        self.message = f"Клан '{clan_name}' не найден"
+        super().__init__(self.message)
+
+
+class RequestError(BaseCustomException):
     pass
 
 
-class NoUpdateTank(Exception):
+class NoUpdateTank(BaseCustomException):
     pass
 
 
-class NoUpdatePlayer(Exception):
+class NoUpdatePlayer(BaseCustomException):
     pass
 
 
-class NoUpdateClan(Exception):
+class NoUpdateClan(BaseCustomException):
     pass
 
 
-class NotFoundPlayerDB(Exception):
+class NotFoundPlayerDB(BaseCustomException):
     pass
+
+
+class NotFoundClanDB(BaseCustomException):
+    def __init__(self, clan_name: str):
+        # Формируем сообщение об ошибке, включая имя клана
+        self.message = f"Клан '{clan_name}' только начали отслеживать"
+        super().__init__(self.message)

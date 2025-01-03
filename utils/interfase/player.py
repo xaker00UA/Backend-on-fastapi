@@ -9,9 +9,12 @@ from ..models import (
     PlayerModel,
     RestPlayer,
 )
-from ..database import Player_sessions, Tank_DB
+from ..database.Mongo import Player_sessions, Tank_DB, Player_all_sessions
 from ..api.wotb import APIServer
 from ..error import *
+import logging
+
+logger = logging.getLogger()
 
 
 class PlayerSession:
@@ -31,7 +34,7 @@ class PlayerSession:
         self.details = PlayerDetails
         self.general = PlayerGeneral
         self.user: User | None = User(
-            region=reg, name=name, id=id, access_token=access_token
+            region=reg, name=name, player_id=id, access_token=access_token
         )
         self.old_user: User | None = None
         self.settings = None
@@ -57,12 +60,28 @@ class PlayerSession:
             )
 
     async def get_player_info(self) -> User:
-        data = await self.session.get_general(self.user)
+        try:
+            data = await self.session.get_general(self.user)
+        except RequestError as e:
+            message = str(e)
+            if "INVALID access_token" in message:
+                self.user.access_token = None
+                data = await self.session.get_general(self.user)
+            else:
+                raise RequestError(message)
         self.user = data
         return self.user
 
-    async def get_player_details(self):
-        data = await self.session.get_details_tank(self.user)
+    async def get_player_details(self, rating=True):
+        try:
+            data = await self.session.get_details_tank(self.user, rating=rating)
+        except RequestError as e:
+            message = str(e)
+            if "INVALID access_token" in message:
+                self.user.access_token = None
+                data = await self.session.get_general(self.user)
+            else:
+                raise RequestError(message)
         self.user = data
 
     async def _results(self):
@@ -136,6 +155,22 @@ class PlayerSession:
 
     @classmethod
     async def update_db(cls):
-        print("starting update")
-        await asyncio.sleep(120)
-        print("waiting for")
+        logger.info("Start update players DB")
+        async for batch in Player_sessions.find_all():
+            tasks = []
+            users = []
+            semaphore = asyncio.Semaphore(10)
+
+            async def semaphore_task(task):
+                async with semaphore:
+                    await task
+
+            for user in batch:
+                user = cls(name=user.name, reg=user.region, id=user.player_id)
+                users.append(user)
+                tasks.append(user.get_player_details(rating=False))
+
+            for task in asyncio.as_completed([semaphore_task(task) for task in tasks]):
+                await task
+            await gather(*[Player_all_sessions.add(user.user) for user in users])
+        logger.info("End update players DB")

@@ -56,7 +56,7 @@ class PlayerDetails(BaseModel, Session):
 class User(BaseModel):
     region: str | None
     name: str | None
-    player_id: int = None
+    player_id: int | None = None
     access_token: str | None = None
     acount: PlayerDetails | PlayerGeneral = None
 

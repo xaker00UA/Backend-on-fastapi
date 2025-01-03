@@ -283,10 +283,9 @@ class PlayerModel(BaseModel, Session, StrMixin):
 
     def result(self):
         res = {}
-        res["time"] = get_time_str(self.updated_at)
         res["statistics"] = self.statistics.result()
         res["private"] = self.private.model_dump() if self.private else None
-        res["last_battle_time"] = time.ctime(self.last_battle_time)
+        res["last_battle_time"] = self.last_battle_time
 
         return res
 

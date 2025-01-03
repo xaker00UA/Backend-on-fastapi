@@ -4,13 +4,14 @@ import asyncio
 import time
 
 from utils.models import PlayerGeneral, User, Singleton, PlayerDetails
+from utils.models.clan import Clan, ClanDetails
 from utils.api.cache import Cache
 from utils.error.exception import *
 from utils.settings.config import Config, EnvConfig
 from utils.error.exception import PlayerNotFound
 import atexit
 
-LIMIT = 10
+LIMIT = 20
 Count = 1
 
 
@@ -69,10 +70,7 @@ class APIServer(Singleton):
             return tok
         raise TypeError()
 
-    async def parse_response(
-        self, response: ClientResponse, count: bool = True, status_response: bool = True
-    ) -> dict:
-        data = await response.json()
+    async def parse_status(self, response: ClientResponse):
         status = response.status
         match status:
             case status if 200 <= status < 300:
@@ -85,6 +83,12 @@ class APIServer(Singleton):
                 raise Exception("Server error")
             case _:
                 raise Exception(f"Unknown error status {status}")
+
+    async def parse_response(
+        self, response: ClientResponse, count: bool = True, status_response: bool = True
+    ) -> dict:
+        data = await response.json()
+
         if status_response:
             if data["status"] != "ok":
                 raise RequestError(
@@ -101,6 +105,7 @@ class APIServer(Singleton):
     async def fetch(self, url, parser=True):
         await self.limiter.wait()
         async with self.session.get(url) as response:
+            self.parse_status(response)
             if parser:
                 return await self.parse_response(response)
             else:
@@ -170,7 +175,7 @@ class APIServer(Singleton):
         )
         return res
 
-    async def get_details_tank(self, user: User) -> User:
+    async def get_details_tank(self, user: User, rating=True) -> User:
         player_id, reg = await self.get_user_id(user)
         token = user.access_token
 
@@ -181,11 +186,27 @@ class APIServer(Singleton):
             .replace("<player_id>", str(player_id))
             .replace("<access_token>", str(token if token else ""))
         )
-        data, gen, rating = await asyncio.gather(
-            self.fetch(url), self.get_general(user), self.get_rating(user)
-        )
+
+        tasks = [
+            asyncio.create_task(self.fetch(url), name="fetch"),
+            asyncio.create_task(self.get_general(user), name="get_general"),
+        ]
+        if rating:
+            tasks.append(asyncio.create_task(self.get_rating(user), name="get_rating"))
+        done, pending = await asyncio.wait(tasks, timeout=5)
+        results = {}
+        for task in done:
+            results[task.get_name()] = task.result()
+
+        for task in pending:
+            results[task.get_name()] = None
+            task.cancel()
+        data = results.get("fetch")
+        gen = results.get("get_general")
+        rat = results.get("get_rating")
         data["tanks"] = data["data"][str(player_id)]
-        gen = gen.model_copy(update={"account": {"statistics": {"rating": rating}}})
+        if rat:
+            gen = gen.model_copy(update={"account": {"statistics": {"rating": rating}}})
         res = User(
             region=reg,
             player_id=player_id,
@@ -210,11 +231,13 @@ class APIServer(Singleton):
         # FIXME: параметров желетально чтобы даже изменяло модель на основе самого
         # FIXME: большого количества параметров
 
-    async def get_token(self, reg="eu") -> str:
+    async def get_token(self, redirect_url, reg="eu") -> str:
         reg = self._get_url_by_reg(reg)
         url_template = self._config.game_api.urls.get_token
-        url = url_template.replace("<reg_url>", reg).replace(
-            "<app_id>", self._get_id_by_reg(reg)
+        url = (
+            url_template.replace("<reg_url>", reg)
+            .replace("<app_id>", self._get_id_by_reg(reg))
+            .replace("<redirect_url>", redirect_url)
         )
         data = await self.fetch(url)
         data = data["data"]["location"]
@@ -236,11 +259,11 @@ class APIServer(Singleton):
         url = url_template.replace("<reg_url>", reg).replace(
             "<player_id>", str(player_id)
         )
-        data = await self.fetch(url, parser=False)
-        if data.get("neighbors"):
+        try:
+            data = await self.fetch(url, parser=False)
             score = data["neighbors"][0]["score"]
             number = data["neighbors"][0]["number"]
-        else:
+        except Exception as e:
             score = 0
             number = 0
         return {"score": score, "number": number}
@@ -258,5 +281,45 @@ class APIServer(Singleton):
         # важно чтобы обновляло сущестующую бд а не заменяло ее так как не все даные есть в этом апи
         pass
 
+    async def get_clan_info(self, name, region) -> Clan:
+        reg = self._get_url_by_reg(region)
+        url_template = self._config.game_api.urls.search_clan
+        url = (
+            url_template.replace("<reg_url>", reg)
+            .replace("<app_id>", self._get_id_by_reg(reg))
+            .replace("<name>", name)
+        )
+        data = await self.fetch(url)
+        for item in data["data"]:
+            if item["name"] == name:
+                return Clan(**item)
+            if item["tag"] == name.upper():
+                return Clan(**item)
+        raise ClanNotFound(name)
+
+    async def get_clan_details(
+        self,
+        region,
+        name=None,
+        clan_id=None,
+    ):
+        reg = self._get_url_by_reg(region)
+        url_template = self._config.game_api.urls.get_clan_info
+        url = url_template.replace("<reg_url>", reg).replace(
+            "<app_id>", self._get_id_by_reg(reg)
+        )
+        if not clan_id:
+            clan = await self.get_clan_info(name, region)
+            clan_id = clan.clan_id
+            url = url.replace("<clan_id>", str(clan_id))
+
+        else:
+            url = url.replace("<clan_id>", str(clan_id))
+        data = await self.fetch(url)
+        return ClanDetails(**data["data"][str(clan_id)])
+
     def close(self):
         asyncio.run(self.session.close())
+
+    def __del__(self):
+        self.close()

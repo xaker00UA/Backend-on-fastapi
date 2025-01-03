@@ -23,5 +23,5 @@ class Config(Singleton):
 
 
 class EnvConfig:
-    WG_APP_IDS = os.getenv("WG_APP_IDS", "d54fbb4c26fae3290d5fb431a38ab932")
+    WG_APP_IDS = os.getenv("WG_APP_IDS", "ccef3112e27c6158fe49486193a53a65")
     LT_APP_IDS = os.getenv("LT_APP_IDS")

@@ -35,12 +35,11 @@ class AuthController:
             "/auth/verify", self.auth_verify_token, methods=["GET"]
         )
 
-    async def login(self, region, response: Response):
+    async def login(self, region, redirect_url, response: Response):
 
         response.set_cookie("region", region, path="/", httponly=True)
-        url = await self.api_server().get_token(reg=region)
+        url = await self.api_server().get_token(reg=region, redirect_url=redirect_url)
         return {"susses": "ok", "url": url}
-        # return JSONResponse(, headers=response.headers)
 
     @require_authentication
     async def logout(self, request: Request):
