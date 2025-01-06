@@ -1,0 +1,45 @@
+name: Build and Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Copy code to EC2
+        run: |
+          rsync -avz --delete ./ ec2-user@${{ secrets.EC2_HOST }}:/app/backend
+
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_HOST }} << 'EOF'
+            cd /app/backend
+
+            # Устанавливаем тег образа
+            if [ "${{ github.ref }}" == "refs/tags/"* ]; then
+              IMAGE_TAG=${{ github.ref_name }}
+            else
+              IMAGE_TAG=latest
+            fi
+
+            # Сборка Docker образа
+            docker build -t backend:$IMAGE_TAG .
+
+            # Обновление и перезапуск контейнера
+            docker-compose pull backend
+            docker-compose up -d backend
+          EOF
