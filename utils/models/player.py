@@ -1,72 +1,77 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from collections import Counter
 from decimal import Decimal
 
 from utils.error.exception import NoUpdatePlayer, NoUpdateTank, ValidError
+from utils.models.respnse_model import General, RestUser
 from .base_models import Data_class, Session
-from .tank import Tank, StatsTank, StatsPlayer, PlayerModel, Rating
+from .tank import Tank, StatsTank, PlayerModel, Rating
 
 
-class PlayerGeneral(PlayerModel):
-    def result(self):
-        return super().result()
-
-
-class PlayerDetails(BaseModel, Session):
-    general: PlayerGeneral | None = None
+class PlayerDetails(PlayerModel, Session):
     tanks: list[Tank]
 
     def __sub__(self, other) -> object:
-        if super().__sub__(other):
-            if (self.general and other.general) is not None:
-                general = self.general - other.general
-            else:
-                general = None
-            tanks = []
-            other_tanks = {element.tank_id: element for element in other.tanks}
-            self_tanks = {element.tank_id: element for element in self.tanks}
-            length = max(other_tanks.keys(), self_tanks.keys())
-            for key in length:
-                res = self_tanks.get(
-                    key, Tank(tank_id=key, all=StatsTank())
-                ) - other_tanks.get(key, Tank(tank_id=key, all=StatsTank()))
-                if res:
-                    tanks.append(res)
-            return PlayerDetails(general=general, tanks=tanks)
+        data = super().__sub__(other)
+        data = data.model_dump()
+        # if (self.general and other.general) is not None:
+        #     general = self.general - other.general
+        # else:
+        #     general = None
+        tanks = []
+        other_tanks = {element.tank_id: element for element in other.tanks}
+        self_tanks = {element.tank_id: element for element in self.tanks}
+        length = max(other_tanks.keys(), self_tanks.keys())
+        for key in length:
+            res = self_tanks.get(
+                key, Tank(tank_id=key, all=StatsTank())
+            ) - other_tanks.get(key, Tank(tank_id=key, all=StatsTank()))
+            if res:
+                tanks.append(res)
 
-    def result(self):
-        data = None
-        if self.general:
-            data = self.general.result()
-        res = [t.result() for t in self.tanks]
-        return (
-            {
-                "time": data.pop("time"),
-                "private": data.pop("private", None),
-                "general": data,
-                "tanks": res,
-            }
-            if data
-            else {"tanks": res}
-        )
+        data["tanks"] = tanks
+
+        return PlayerDetails(**data)
+
+    def result(self, type="session"):
+        model = super().result(type=type)
+        match type:
+            case "session":
+                general = General(session=[tank.result() for tank in self.tanks])
+            case "now":
+                general = General(now=[tank.result() for tank in self.tanks])
+            case "update":
+                general = General(update=[tank.result() for tank in self.tanks])
+        model.tanks = general
+        return model
 
 
-class User(BaseModel):
+class UserDB(BaseModel, Session):
     region: str | None
     name: str | None
     player_id: int | None = None
     access_token: str | None = None
-    acount: PlayerDetails | PlayerGeneral = None
-
-    class Config:
-        extra = "ignore"
+    acount: PlayerDetails | PlayerModel = None
+    timestamp: int = Field(default_factory=lambda: int(datetime.now().timestamp()))
 
     def __sub__(self, other):
         if not isinstance(other, self.__class__):
             return NotImplemented
-        return self.model_copy(update={"acount": self.acount - other.acount})
+        return self.model_copy(
+            update={
+                "acount": self.acount - other.acount,
+                "timestamp": self.timestamp - other.timestamp,
+            },
+            deep=True,
+        )
+
+    def result(self, type="session") -> RestUser:
+        model = self.acount.result(type=type)
+        model.region = self.region
+        model.time = self.timestamp
+        return model
 
 
 class RestPlayer(BaseModel):

@@ -1,5 +1,14 @@
-from functools import wraps
-from fastapi import APIRouter, Query, Request, Cookie, Response, BackgroundTasks
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Cookie,
+    Response,
+    BackgroundTasks,
+    status,
+)
 from fastapi.responses import RedirectResponse, JSONResponse
 
 
@@ -7,93 +16,59 @@ from ...api.wotb import APIServer
 from ...interfase.player import PlayerSession
 
 
-def require_authentication(func):
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        request = kwargs.get("request")
-        token = request.cookies.get("access_token", None)
-        if not token:
-            response = RedirectResponse(url="/login/eu")
-            response.set_cookie("next_url", request.url.path)
-            return response
-        return await func(*args, **kwargs)
-
-    return wrapper
-
-
-class AuthController:
-    def __init__(self):
-        self.router = APIRouter(tags=["auth"])
-        self.api_server = APIServer  # Инициализация API сервера
-        self._setup_routes()
-
-    def _setup_routes(self):
-        self.router.add_api_route("/login/{region}", self.login, methods=["GET"])
-        self.router.add_api_route("/logout", self.logout, methods=["GET"])
-        self.router.add_api_route("/auth", self.auth, methods=["GET"])
-        self.router.add_api_route(
-            "/auth/verify", self.auth_verify_token, methods=["GET"]
+async def require_authentication(request: Request):
+    token = request.cookies.get("access_token", None)
+    if not token:
+        # Если пользователь не авторизован
+        response = RedirectResponse(url="/login/eu")
+        response.set_cookie("next_url", request.url.path)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not authenticated",
+            headers={"Location": "/login/eu"},  # Необязательно, но полезно
         )
-
-    async def login(self, region, redirect_url, response: Response):
-
-        response.set_cookie("region", region, path="/", httponly=True)
-        url = await self.api_server().get_token(reg=region, redirect_url=redirect_url)
-        return {"susses": "ok", "url": url}
-
-    @require_authentication
-    async def logout(self, request: Request):
-        token = request.cookies.get("access_token")
-        await PlayerSession(access_token=token).logout()
-        response = JSONResponse({"susses": "ok"})
-        response.delete_cookie("access_token")
-        return response
-
-    async def auth(
-        self,
-        request: Request,
-        background_tasks: BackgroundTasks,
-        access_token: str = Query,
-        nickname: str = Query,
-        account_id: int = Query,
-        expires_at: int = Query,
-        region: str = Cookie(),
-    ):
-
-        pl = PlayerSession(
-            name=nickname, id=account_id, reg=region, access_token=access_token
-        )
-
-        async def add_player_task():
-            await pl.add_player()
-
-        background_tasks.add_task(add_player_task)
-
-        url = request.cookies.get("next_url", None)
-        if url:
-            # Формируем RedirectResponse
-            response = RedirectResponse(url=url, status_code=302)
-        else:
-            response = JSONResponse(
-                {"susses": "ok", "nickname": nickname, "region": region}
-            )
-        # Удаляем временные cookies, если они есть
-        response.delete_cookie("next_url")
-        response.delete_cookie("region")
-
-        # Устанавливаем cookie для токена
-        response.set_cookie("access_token", access_token, httponly=True, path="/")
-
-        # Возвращаем RedirectResponse
-        return response
-
-    async def auth_verify_token(self, request: Request):
-        token = request.cookies.get("access_token")
-        return {"isAuthenticated": True} if token else {"isAuthenticated": False}
+    # Если требуется дополнительная проверка токена, добавьте её здесь
+    return (
+        token  # Возвращает токен или другую информацию, если пользователь авторизован
+    )
 
 
-# Инициализация контроллера
-auth_controller = AuthController()
+router = APIRouter(tags=["auth"])
 
-# Регистрируем маршруты в основном приложении
-router = auth_controller.router
+
+@router.get("/login/{region}")
+async def login(region: str, redirect_url: str, response: Response):
+    response.set_cookie("region", region, path="/", httponly=True)
+    url = await PlayerSession.get_token(region=region, redirect_url=redirect_url)
+    return {"susses": "ok", "url": url}
+
+
+@router.get("/logout")
+async def logout(token=Depends(require_authentication)):
+    await PlayerSession(access_token=token).logout()
+    response = JSONResponse({"susses": "ok"})
+    response.delete_cookie("access_token")
+    return response
+
+
+@router.get("/auth")
+async def auth(
+    background_tasks: BackgroundTasks,
+    access_token: str = Query(),
+    nickname: str = Query(),
+    account_id: int = Query(),
+    region: str = Cookie(),
+):
+    player = PlayerSession(
+        name=nickname, id=account_id, reg=region, access_token=access_token
+    )
+    background_tasks.add_task(player.add_player)
+    response = JSONResponse({"susses": "ok", "nickname": nickname, "region": region})
+    response.delete_cookie("region")
+    response.set_cookie("access_token", access_token, httponly=True, path="/")
+    return response
+
+
+@router.get("/auth/verify")
+async def auth_verify_token(access_token: str = Cookie(None)):
+    return {"isAuthenticated": True} if access_token else {"isAuthenticated": False}

@@ -1,6 +1,8 @@
 from datetime import datetime
 from pydantic import BaseModel, Field
-from .player import PlayerGeneral, PlayerModel
+
+from utils.models.tank import PlayerModel
+from .respnse_model import RestClan, RestMember
 from .base_models import Session
 
 
@@ -28,29 +30,13 @@ class ClanDetails(BaseModel):
     tag: str
 
 
-class RestMember(BaseModel):
-    nickname: str
-    statistics: dict
-    last_battle_time: int | str
-
-
-class RestClan(BaseModel):
-    region: str
-    name: str
-    clan_id: int
-    tag: str
-    members_count: int
-    members: list[RestMember]
-    time: int | str | None
-
-
 class ClanDB(BaseModel, Session):
     region: str
     name: str
     clan_id: int
     tag: str
     members_count: int
-    members: list[PlayerGeneral]
+    members: list[PlayerModel]
     timestamp: int = Field(default_factory=lambda: int(datetime.now().timestamp()))
 
     def __sub__(self, other: "ClanDB") -> RestClan:
@@ -64,10 +50,19 @@ class ClanDB(BaseModel, Session):
             for key in common_keys:
                 res = self_members[key] - other_members[key]
                 res = res.result()
-                if res["statistics"]["rating"] or res["statistics"]["all"]:
-                    res["nickname"] = self_members[key].nickname
-                    members.append(res)
+                if res.general.session.all or res.general.session.rating:
+                    result = RestMember(
+                        id=res.id,
+                        nickname=res.name,
+                        general=res.general.session,
+                        last_battle_time=0,
+                    )
+                    members.append(result)
+
             data = self.model_dump(exclude={"members", "members_count", "timestamp"})
             return RestClan(
                 members=members, time=timestamp, members_count=len(members), **data
             )
+
+    def result() -> RestClan:
+        pass

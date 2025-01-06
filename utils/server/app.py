@@ -3,13 +3,9 @@ from fastapi import FastAPI, APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import logging
-import logging.config
-from ..api.wotb import APIServer
-from ..models import User
 from .auth import router as auth_router
 from .api_player import router as player_router, stats as player_stats
 from .api_clan.api_clan import router as clan_router
-from .api_socket import player_router_socket
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -22,7 +18,9 @@ handler = RotatingFileHandler(
 )
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 handler.setFormatter(formatter)
-
+debug_handler = RotatingFileHandler(
+    "debug.log", encoding="utf-8", maxBytes=10 * 1024 * 1024, backupCount=5
+)
 logger = logging.getLogger()
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
@@ -47,7 +45,7 @@ app.include_router(auth_router)
 app.include_router(player_router)
 app.include_router(player_stats)
 app.include_router(clan_router)
-# app.include_router(player_router_socket)
+
 
 origins = [
     "http://localhost:5173",

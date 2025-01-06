@@ -1,9 +1,11 @@
 from asyncio import gather
 import asyncio
+from itertools import zip_longest
+
+from utils.models.respnse_model import General, RestUser
 from ..models import (
     PlayerDetails,
-    PlayerGeneral,
-    User,
+    UserDB,
     Tank,
     Rating,
     PlayerModel,
@@ -18,6 +20,8 @@ logger = logging.getLogger()
 
 
 class PlayerSession:
+    session = APIServer()
+
     def __init__(
         self,
         name: str = None,
@@ -30,25 +34,18 @@ class PlayerSession:
         self.name = name
         self.id = id
         self.region = reg
-        self.session = APIServer()
+
         self.details = PlayerDetails
-        self.general = PlayerGeneral
-        self.user: User | None = User(
+        self.user: UserDB | None = UserDB(
             region=reg, name=name, player_id=id, access_token=access_token
         )
-        self.old_user: User | None = None
+        self.old_user: UserDB | None = None
         self.settings = None
 
     async def add_player(self):
-        try:
-            await self.get_player_details()
-            await Player_sessions.update(self.user)
-            return True
-        except PlayerNotFound:
-            return "Игрок не найден"
-        except Exception as e:
-            return str(e)
-            # TODO: logging exception
+        await self.get_player_details()
+        await Player_sessions.update(self.user)
+        return True
 
     async def get_player_DB(self):
         self.old_user = await Player_sessions.get(
@@ -56,10 +53,13 @@ class PlayerSession:
         )
         if not self.old_user:
             raise NotFoundPlayerDB(
-                self.name, self.id, self.region, self.user.access_token
+                name=self.name,
+                player_id=self.id,
+                region=self.region,
+                access_token=self.user.access_token,
             )
 
-    async def get_player_info(self) -> User:
+    async def get_player_info(self) -> UserDB:
         try:
             data = await self.session.get_general(self.user)
         except RequestError as e:
@@ -77,7 +77,7 @@ class PlayerSession:
             data = await self.session.get_details_tank(self.user, rating=rating)
         except RequestError as e:
             message = str(e)
-            if "INVALID access_token" in message:
+            if "INVALID_ACCESS_TOKEN" in message:
                 self.user.access_token = None
                 data = await self.session.get_general(self.user)
             else:
@@ -89,27 +89,53 @@ class PlayerSession:
             await self.get_player_DB()
         except NotFoundPlayerDB:
             await self.session.get_id(self.user.region, self.user.name)
-            raise NotFoundPlayerDB
+            raise NotFoundPlayerDB(
+                name=self.name,
+                player_id=self.id,
+                region=self.region,
+                access_token=self.user.access_token,
+            )
 
-        self.user: User = await self.session.get_details_tank(self.old_user)
+        self.user: UserDB = await self.session.get_details_tank(self.old_user)
         user = self.user - self.old_user
-        data = user.acount.result()
-        res = RestPlayer(
-            id=self.user.player_id, name=self.user.name, region=self.user.region, **data
-        )
-        tasks = [Tank_DB.get_by_id(tank["tank_id"]) for tank in res.tanks]
-        tanks = await gather(*tasks)
-        for tank, db_tank in zip(res.tanks, tanks):
-            tank.update(db_tank)
-        return res
+        model = user.result()
+        return model
 
-    async def results(self) -> set[RestPlayer, RestPlayer, PlayerDetails]:
+    async def results(self) -> RestPlayer:
         session = await self._results()
-        if not isinstance(session, str):
-            updated = await self.update_stats(session)
-            return session, updated, self.user.acount.result()
-        else:
-            return (session,)
+        now = await self._now_stats()
+        update = await self._update_stats()
+        if now.tanks.now:
+            tasks = [tank.tank_id for tank in now.tanks.now]
+            data = await Tank_DB.get_list_id(tasks)
+
+            def update_object_with_data(obj):
+                if obj and obj.tank_id in data:
+                    obj.__dict__.update(data[obj.tank_id])
+
+            for ses, now_item, upd in zip_longest(
+                session.tanks.session,
+                now.tanks.now,
+                update.tanks.session,
+                fillvalue=None,
+            ):
+                update_object_with_data(ses)
+                update_object_with_data(now_item)
+                update_object_with_data(upd)
+        session = self.update_model_rest(session, update, now, "general")
+        session = self.update_model_rest(session, update, now, "tanks")
+
+        return session
+
+    @staticmethod
+    def update_model_rest(session, update, now, field_name):
+        data = {
+            "update": getattr(update, field_name).session,
+            "session": getattr(session, field_name).session,
+            "now": getattr(now, field_name).now,
+        }
+        validated_data = General.model_validate(data)
+        return session.model_copy(update={field_name: validated_data}, deep=True)
 
     async def reset(self):
         await self.get_player_DB()
@@ -117,25 +143,15 @@ class PlayerSession:
         await Player_sessions.add(self.user)
         return None
 
-    async def update_stats(self, object: RestPlayer):
-        new = self.user.acount.result()
-        old = self.old_user.acount.result()
-        tank_id = [tank_id["tank_id"] for tank_id in object.tanks]
-        new["tanks"] = [tank for tank in new["tanks"] if tank["tank_id"] in tank_id]
-        old["tanks"] = [tank for tank in old["tanks"] if tank["tank_id"] in tank_id]
-        new = RestPlayer(
-            id=self.user.player_id, region=self.region, name=self.user.name, **new
-        )
-        old = RestPlayer(
-            id=self.user.player_id, region=self.region, name=self.user.name, **old
-        )
-        res = old - new
-        for i in res.tanks:
-            for j in object.tanks:
-                if i["tank_id"] == j["tank_id"]:
-                    i["tier"] = j["tier"]
-                    i["name"] = j["name"]
-        return res
+    async def _now_stats(self):
+        now = self.user.result("now")
+        return now
+
+    async def _update_stats(self):
+        old = self.old_user.result()
+        now = self.user.result()
+        update = now - old
+        return update
 
     async def logout(self):
         await self.get_player_DB()
@@ -143,8 +159,11 @@ class PlayerSession:
         self.old_user.access_token = None
         await Player_sessions.update(self.old_user)
 
-    async def get_players(self) -> list[User] | list:
+    async def get_players(self) -> list[UserDB] | list:
         return await Player_sessions.gets(self.user)
+
+    async def top_players_server(self):
+        pass
 
     async def _get_attributes(self):
         self.attributes = await self.settings.get_params()
@@ -152,6 +171,10 @@ class PlayerSession:
 
     async def get_session(self) -> dict:
         pass
+
+    @classmethod
+    async def get_token(self, region, redirect_url):
+        return await self.session.get_token(region, redirect_url)
 
     @classmethod
     async def update_db(cls):

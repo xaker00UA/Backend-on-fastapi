@@ -1,36 +1,20 @@
-import asyncio
+from pydantic import BaseModel
 
 
-async def one_task():
-    await asyncio.sleep(5)
-    print("one_task")
+class User(BaseModel):
+    name: str
 
 
-async def two_task():
-    await asyncio.sleep(3)
-    print("two_task")
+class UserLogin(User):
+    password: str
 
 
-async def three_task():
-    await asyncio.sleep(5)
-    print("three_task")
+class Player(BaseModel):
+    id: int
+    user: User
 
 
-async def main():
-    tasks = [
-        # asyncio.create_task(one_task(), name="1"),
-        asyncio.create_task(two_task(), name="2"),
-        # asyncio.create_task(three_task(), name="3"),
-        # asyncio.create_task(three_task(), name="4"),
-    ]
-    done, pending = await asyncio.wait(tasks, timeout=3)
+user = UserLogin(name="xakker", password="1234")
 
-    for task in done:
-        print(task.result())  # Получаем результат выполнения
-        print(task.get_name())
-    print("---Pending tasks---")
-    for task in pending:
-        print(task.get_name())
-
-
-asyncio.run(main())
+player = Player(id=123, user=user)
+print(player.model_dump(serialize_as_any=True))

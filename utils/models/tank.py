@@ -1,12 +1,19 @@
-from abc import ABCMeta
 from dataclasses import dataclass, field
-import time
-from pydantic import BaseModel
-from datetime import datetime, timedelta
-from typing import Optional, Dict
-from utils.error.exception import NoUpdateTank
-from .base_models import Data_class, Session
+from pydantic import BaseModel, computed_field
+from typing import Optional
+from .base_models import Session
 from .configmodel import StrMixin
+from .respnse_model import (
+    General,
+    ItemTank,
+    RestMember,
+    RestPrivate,
+    RestRating,
+    RestStatistics,
+    RestStatsTank,
+    BaseStats,
+    RestUser,
+)
 
 
 # Модель статистики игрового танка и игрока
@@ -29,16 +36,57 @@ class StatsTank(BaseModel, Session):
     survived_battles: int = 0
     dropped_capture_points: int = 0
 
-    class Config:
-        extra = "ignore"
+    @computed_field(return_type=float)
+    @property
+    def damage(self):
+        return round(self.damage_dealt / self.battles, 2) if self.battles != 0 else 0
 
-    def __eq__(self, other: object) -> bool:
-        if isinstance(self, other.__class__):
-            return all(getattr(self, k) == getattr(other, k) for k in self.__dict__)
-        return False
+    @computed_field(return_type=float)
+    @property
+    def winrate(self):
+        return round(self.wins / self.battles * 100, 2) if self.battles != 0 else 0
 
-    def __ne__(self, other: object) -> bool:
-        return not self.__eq__(other)
+    @computed_field(return_type=float)
+    @property
+    def accuracy(self):
+        return round(self.hits / self.shots * 100, 2) if self.shots != 0 else 0
+
+    @computed_field(return_type=float)
+    @property
+    def survival(self):
+        return (
+            round(self.survived_battles / self.battles * 100, 2)
+            if self.battles != 0
+            else 0
+        )
+
+    @computed_field(return_type=float)
+    @property
+    def avg_xp(self):
+        return round(self.xp / self.battles, 2) if self.battles != 0 else 0
+
+    @computed_field(return_type=float)
+    @property
+    def wins_and_survived(self):
+        return (
+            round(self.win_and_survived / self.battles * 100, 2)
+            if self.battles != 0
+            else 0
+        )
+
+    @computed_field(return_type=float)
+    @property
+    def murder_to_murder(self):
+        return round(self.frags / self.battles, 2) if self.battles != 0 else 0
+
+    @computed_field(return_type=float)
+    @property
+    def damage_coefficient(self):
+        return (
+            round(self.damage_dealt / self.damage_received, 2)
+            if self.damage_received != 0
+            else 0
+        )
 
     def __sub__(self, other):
         if super().__sub__(other):
@@ -51,69 +99,16 @@ class StatsTank(BaseModel, Session):
             return NotImplemented
 
     def result(self):
-        if self.battles != 0:
-            battles = self.battles
-            wins = round(self.wins / self.battles * 100, 2)
-            damage = round(self.damage_dealt / self.battles, 2)
-            accuracy = round(self.hits / self.shots * 100, 2) if self.shots != 0 else 0
-            survived_battles = round(self.survived_battles / self.battles * 100, 2)
-            xp = round(self.xp / self.battles, 2)
-            win_and_survived = round(self.win_and_survived / self.battles * 100, 2)
-            frags = round(self.frags / self.battles, 2)
-            kpd = (
-                round(self.damage_dealt / self.damage_received, 2)
-                if self.damage_received != 0
-                else 0
-            )
-        else:
-            (
-                battles,
-                wins,
-                damage,
-                accuracy,
-                survived_battles,
-                xp,
-                win_and_survived,
-                frags,
-                kpd,
-            ) = (0, 0, 0, 0, 0, 0, 0, 0, 0)
-        return {
-            "Бои": battles,
-            "Победы": wins,
-            "Урон": damage,
-            "Точность": accuracy,
-            "Выживаемость": survived_battles,
-            "Опыт за бой": xp,
-            "Победил и выжил": win_and_survived,
-            "Килы к убийств": frags,
-            "КПД": kpd,
-        }
-
-
-# Модель дополнительная модель игрока
-class StatsPlayer(StatsTank):
-    max_frags_tank_id: int = 0
-    max_xp_tank_id: int = 0
-
-    # TODO: Update __sub__()
-    class Config:
-        extra = "ignore"
+        return RestStatsTank(**self.model_dump())
 
 
 # Модель танка
 class Tank(BaseModel, Session):
     all: StatsTank
     last_battle_time: int = 0
-    account_id: int = 0
-    in_garage_updated: Optional[int] = None
-    frags: Optional[Dict[str, int]] = None
-    mark_of_mastery: int = 0
     battle_life_time: int = 0
     in_garage: Optional[bool] = None
     tank_id: int = 0
-
-    class Config:
-        extra = "ignore"
 
     def __sub__(self, other: object):
         if super().__sub__(other):
@@ -133,16 +128,12 @@ class Tank(BaseModel, Session):
             return NotImplemented
 
     def result(self):
-        res = {}
-        res["all"] = self.all.result()
-        res["tank_id"] = self.tank_id
-        res["last_battle_time"] = time.ctime(self.last_battle_time)
-        res["battle_life_time"] = get_time_str(self.battle_life_time)
-
-        return res
+        data = self.model_dump()
+        data["all"] = self.all.result()
+        return ItemTank(**data)
 
 
-class Private(BaseModel):
+class Private(BaseModel, Session):
     gold: int = 0
     ban_info: Optional[str] = None
     free_xp: int = 0
@@ -151,17 +142,6 @@ class Private(BaseModel):
     credits: int = 0
     premium_expires_at: int = 0
     battle_life_time: int = 0
-
-    class Config:
-        extra = "ignore"
-
-    def __eq__(self, value: object) -> bool:
-        if isinstance(value, self.__class__):
-            return all(getattr(self, k) == getattr(value, k) for k in self.__dict__)
-        return False
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
 
     def __sub__(self, other: object):
         if isinstance(other, self.__class__):
@@ -172,6 +152,9 @@ class Private(BaseModel):
                 if field not in ["ban_info", "ban_time", "is_premium"]:
                     res[field] = abs(value - getattr(other, field))
             return self.model_copy(update=res)
+
+    def result(self):
+        return RestPrivate(**self.model_dump())
 
 
 # Модель рейтинга
@@ -199,17 +182,6 @@ class Rating(BaseModel, Session):
     score: int | None = None
     number: int | None = None
 
-    def __eq__(self, value: object) -> bool:
-        if isinstance(value, self.__class__):
-            return all(getattr(self, k) == getattr(value, k) for k in self.__dict__)
-        return False
-
-    def __ne__(self, value: object) -> bool:
-        return not self.__eq__(value)
-
-    class Config:
-        extra = "ignore"
-
     def __sub__(self, other):
         if super().__sub__(other):
             if self.__eq__(other):
@@ -223,16 +195,13 @@ class Rating(BaseModel, Session):
             raise TypeError("Ожидается объект класса %s", self.__class__.__name__)
 
     def result(self):
-        res = StatsPlayer(**self.__dict__).result()
-        res["number"] = self.number
-        res["score"] = self.score
-
-        return res
+        res = StatsTank(**self.model_dump()).result()
+        return RestRating(score=self.score, number=self.number, **res.model_dump())
 
 
-class Statistics(BaseModel):
-    rating: Optional[Rating] = None
-    all: Optional[StatsPlayer] = None
+class Statistics(BaseModel, Session):
+    rating: Rating | None
+    all: StatsTank | None
 
     def __sub__(self, other):
         if isinstance(other, self.__class__):
@@ -243,24 +212,24 @@ class Statistics(BaseModel):
             return NotImplemented
 
     def result(self):
-        res = {}
-        res["rating"] = self.rating.result() if self.rating else None
-        res["all"] = self.all.result() if self.all else None
-        return res
-
-    class Config:
-        extra = "ignore"
+        data, all = None, None
+        if self.rating:
+            data = self.rating.result()
+        if self.all:
+            all = self.all.result()
+        return RestStatistics(all=all, rating=data)
 
 
 # Общая модель игрока
 class PlayerModel(BaseModel, Session, StrMixin):
+    nickname: str
     account_id: int = 0
     created_at: int = 0
     updated_at: int = 0
     private: Private | None
     statistics: Statistics
     last_battle_time: int = 0
-    nickname: str
+
     # OPTIMIZE: private.__sub__()
 
     def __sub__(self, other):
@@ -281,24 +250,18 @@ class PlayerModel(BaseModel, Session, StrMixin):
             )
         return NotImplemented
 
-    def result(self):
-        res = {}
-        res["statistics"] = self.statistics.result()
-        res["private"] = self.private.model_dump() if self.private else None
-        res["last_battle_time"] = self.last_battle_time
-
-        return res
-
-    class Config:
-        extra = "ignore"
-
-
-def get_time_str(int):
-    time_delta = timedelta(seconds=int)
-
-    # Вывод дней, часов, минут и секунд
-    days = time_delta.days
-    hours, remainder = divmod(time_delta.seconds, 3600)  # Остаток после деления на часы
-    minutes, seconds = divmod(remainder, 60)  # Остаток после деления на минуты
-
-    return f"{days} дней, {hours} часов, {minutes} минут, {seconds} секунд."
+    def result(self, type="session") -> RestUser:
+        private = self.private.result() if self.private else None
+        match type:
+            case "session":
+                general = General(session=self.statistics.result())
+            case "now":
+                general = General(now=self.statistics.result())
+            case "update":
+                general = General(update=self.statistics.result())
+        return RestUser(
+            id=self.account_id,
+            name=self.nickname,
+            private=private,
+            general=general,
+        )

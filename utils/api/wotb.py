@@ -3,10 +3,11 @@ from asynciolimiter import Limiter
 import asyncio
 import time
 
-from utils.models import PlayerGeneral, User, Singleton, PlayerDetails
+from utils.models import UserDB, Singleton, PlayerDetails
 from utils.models.clan import Clan, ClanDetails
 from utils.api.cache import Cache
 from utils.error.exception import *
+from utils.models.tank import PlayerModel
 from utils.settings.config import Config, EnvConfig
 from utils.error.exception import PlayerNotFound
 import atexit
@@ -105,13 +106,13 @@ class APIServer(Singleton):
     async def fetch(self, url, parser=True):
         await self.limiter.wait()
         async with self.session.get(url) as response:
-            self.parse_status(response)
+            await self.parse_status(response)
             if parser:
                 return await self.parse_response(response)
             else:
                 return await response.json()
 
-    async def get_user_id(self, user: User) -> tuple[int, str]:
+    async def get_user_id(self, user: UserDB) -> tuple[int, str]:
         player_id = user.player_id
         reg = user.region
         if not player_id:
@@ -145,12 +146,12 @@ class APIServer(Singleton):
         )
         data = await self.fetch(url)
         player_id = int(data["data"][0]["account_id"])
-        user = User(region=region, name=nickname, player_id=player_id)
+        user = UserDB(region=region, name=nickname, player_id=player_id)
 
         self.cache.set(nickname, user)
         return player_id
 
-    async def get_general(self, user: User) -> User:
+    async def get_general(self, user: UserDB) -> UserDB:
         player_id, reg = await self.get_user_id(user)
         token = user.access_token
 
@@ -165,8 +166,8 @@ class APIServer(Singleton):
         # rating = await self.get_raring(user)
         data = data["data"][str(player_id)]
         # data["statistics"]["rating"].update(rating)
-        general = PlayerGeneral(**data)
-        res = User(
+        general = PlayerModel(**data)
+        res = UserDB(
             region=reg,
             player_id=player_id,
             acount=general,
@@ -175,7 +176,7 @@ class APIServer(Singleton):
         )
         return res
 
-    async def get_details_tank(self, user: User, rating=True) -> User:
+    async def get_details_tank(self, user: UserDB, rating=True) -> UserDB:
         player_id, reg = await self.get_user_id(user)
         token = user.access_token
 
@@ -207,12 +208,12 @@ class APIServer(Singleton):
         data["tanks"] = data["data"][str(player_id)]
         if rat:
             gen = gen.model_copy(update={"account": {"statistics": {"rating": rating}}})
-        res = User(
+        res = UserDB(
             region=reg,
             player_id=player_id,
             name=user.name,
             access_token=token,
-            acount=PlayerDetails(**data, general=gen.acount),
+            acount=PlayerDetails(**data, **gen.acount.model_dump()),
         )
         return res
 

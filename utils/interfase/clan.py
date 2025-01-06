@@ -68,6 +68,9 @@ class ClanInterface:
         res = await Clan_sessions.add(res)
         return res
 
+    async def get_clans(self) -> list:
+        return await Clan_sessions.gets(self.name)
+
     @classmethod
     async def update_db(cls):
         logger.info("Start update clan db")

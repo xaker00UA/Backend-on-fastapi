@@ -34,7 +34,19 @@ class NoUpdateClan(BaseCustomException):
 
 
 class NotFoundPlayerDB(BaseCustomException):
-    pass
+    def __init__(self, **kwargs):
+        args = [f"{key}={value}" for key, value in kwargs.items() if value]
+
+        # Формируем основное сообщение
+        message = (
+            f"Игрок не найден. Со следующими аргументами {', '.join(args)}"
+            if args
+            else "Игрок не найден. Аргументов нет"
+        )
+
+        # Устанавливаем сообщение об ошибке
+        self.message = message
+        super().__init__(self.message)
 
 
 class NotFoundClanDB(BaseCustomException):

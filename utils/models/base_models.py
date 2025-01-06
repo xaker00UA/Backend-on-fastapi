@@ -14,8 +14,20 @@ class Data_class(ABC):
 
 class Session(ABC):
     @abstractmethod
-    def __sub__(self, other):
+    def __sub__(self, other) -> "Session":
         return isinstance(other, type(self))
+
+    @abstractmethod
+    def result(self) -> dict:
+        pass
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return all(getattr(self, k) == getattr(other, k) for k in self.__dict__)
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
 
 class Singleton:
