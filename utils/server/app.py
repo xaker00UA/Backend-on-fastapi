@@ -1,6 +1,4 @@
-import json
-from fastapi import FastAPI, APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from .auth import router as auth_router
@@ -29,7 +27,7 @@ logger.setLevel(logging.INFO)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
-    trigger = CronTrigger(hour=22, minute=48, second=20)
+    trigger = CronTrigger(hour=22, minute=30, second=20)
     trigger_clan = CronTrigger(week=1, day_of_week="fri", hour=00, minute=27)
     scheduler.add_job(PlayerSession.update_db, trigger=trigger)
     scheduler.add_job(ClanInterface.update_db, trigger=trigger_clan)

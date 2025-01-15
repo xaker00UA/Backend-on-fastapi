@@ -171,7 +171,7 @@ class APIServer(Singleton):
             region=reg,
             player_id=player_id,
             acount=general,
-            name=user.name,
+            name=data["nickname"],
             access_token=token,
         )
         return res

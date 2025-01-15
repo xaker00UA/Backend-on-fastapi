@@ -174,7 +174,7 @@ class PlayerSession:
 
     @classmethod
     async def get_token(self, region, redirect_url):
-        return await self.session.get_token(region, redirect_url)
+        return await self.session.get_token(redirect_url=redirect_url, reg=region)
 
     @classmethod
     async def update_db(cls):

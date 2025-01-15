@@ -12,8 +12,7 @@ from ..models.clan import ClanDB
 
 class Connect:
     client = AsyncIOMotorClient(os.getenv("MONGO", "mongodb://localhost:27017/"))
-    # db = client.test_db
-    db = client.wotblitz
+    db = client[os.getenv("NAME_DB", "wotblitz")]
 
     @classmethod
     async def add(cls, data):

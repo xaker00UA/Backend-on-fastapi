@@ -111,6 +111,18 @@ class RestPrivate(BaseModel):
     premium_expires_at: int = 0
     battle_life_time: int = 0
 
+    def __sub__(self, other):
+        if isinstance(other, RestPrivate):
+            return self.model_copy(
+                update={
+                    attr: round(getattr(self, attr) - getattr(other, attr), 2)
+                    for attr in vars(self)
+                    if getattr(self, attr)
+                    and getattr(other, attr)
+                    and isinstance(getattr(self, attr), int)
+                }
+            )
+
 
 class RestUser(BaseModel):
     id: int | None = None
