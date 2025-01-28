@@ -27,8 +27,8 @@ logger.setLevel(logging.INFO)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
-    trigger = CronTrigger(hour=22, minute=30, second=20)
-    trigger_clan = CronTrigger(week=1, day_of_week="fri", hour=00, minute=27)
+    trigger = CronTrigger(hour=12, minute=00, second=00)
+    trigger_clan = CronTrigger(week=1, day_of_week="mon", hour=12, minute=00)
     scheduler.add_job(PlayerSession.update_db, trigger=trigger)
     scheduler.add_job(ClanInterface.update_db, trigger=trigger_clan)
     print("Starting the scheduler...")

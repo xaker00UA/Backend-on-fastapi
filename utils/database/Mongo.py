@@ -5,7 +5,6 @@ from motor.motor_asyncio import (
     AsyncIOMotorCursor,
 )
 import os
-import asyncio
 from ..models import UserDB, Tank
 from ..models.clan import ClanDB
 
@@ -39,10 +38,8 @@ class Player_sessions(Connect):
             filter=filter,
         )
         if res:
-            user = UserDB.model_validate(res)
-        else:
-            user = None
-        return user
+            res = UserDB.model_validate(res)
+        return res
 
     @classmethod
     async def add(cls, user: UserDB) -> UserDB:
@@ -153,6 +150,161 @@ class Player_all_sessions(Player_sessions):
     async def add(cls, user: UserDB) -> UserDB:
         await cls.collection.insert_one(user.model_dump())
         return user
+
+    @classmethod
+    async def get(cls, user: UserDB, timestamp_ago: int) -> UserDB:
+        filter = {
+            "$and": [
+                {"player_id": user.player_id},
+                {"timestamp": {"$lte": timestamp_ago}},
+            ]
+        }
+        res = await cls.collection.find_one(filter=filter, sort=[("timestamp", -1)])
+        if res:
+            return UserDB.model_validate(res)
+
+    @classmethod
+    async def get_top(cls, parameter, start_day, limit=10):
+        pipeline = [
+            {"$match": {"timestamp": {"$gte": start_day}}},
+            {"$sort": {"timestamp": 1}},
+            {
+                "$group": {
+                    "_id": "$player_id",
+                    "name": {"$last": "$name"},
+                    "region": {"$last": "$region"},
+                    "lastBattle": {"$last": "$acount.statistics.all.battles"},
+                    "firstBattle": {"$first": "$acount.statistics.all.battles"},
+                    "lastWins": {"$last": "$acount.statistics.all.wins"},
+                    "firstWins": {"$first": "$acount.statistics.all.wins"},
+                    "lastDamage": {"$last": "$acount.statistics.all.damage_dealt"},
+                    "firstDamage": {"$first": "$acount.statistics.all.damage_dealt"},
+                }
+            },
+        ]
+
+        if parameter == "battles":
+            pipeline.append(
+                {
+                    "$project": {
+                        "name": 1,
+                        "region": 1,
+                        "battles": {"$subtract": ["$lastBattle", "$firstBattle"]},
+                    }
+                }
+            )
+            pipeline.append({"$sort": {"battles": -1}})
+
+        elif parameter == "wins":
+            pipeline.append(
+                {
+                    "$project": {
+                        "name": 1,
+                        "region": 1,
+                        "wins": {
+                            "$round": [
+                                {
+                                    "$cond": [
+                                        {
+                                            "$eq": [
+                                                {
+                                                    "$subtract": [
+                                                        "$lastBattle",
+                                                        "$firstBattle",
+                                                    ]
+                                                },
+                                                0,
+                                            ]
+                                        },
+                                        0,
+                                        {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        {
+                                                            "$subtract": [
+                                                                "$lastWins",
+                                                                "$firstWins",
+                                                            ]
+                                                        },
+                                                        {
+                                                            "$subtract": [
+                                                                "$lastBattle",
+                                                                "$firstBattle",
+                                                            ]
+                                                        },
+                                                    ]
+                                                },
+                                                100,
+                                            ]
+                                        },
+                                    ]
+                                },
+                                2,
+                            ]
+                        },
+                    }
+                }
+            )
+            pipeline.append({"$sort": {"wins": -1}})
+
+        elif parameter == "damage":
+            pipeline.append(
+                {
+                    "$project": {
+                        "name": 1,
+                        "region": 1,
+                        "damage": {
+                            "$round": [
+                                {
+                                    "$cond": [
+                                        {
+                                            "$eq": [
+                                                {
+                                                    "$subtract": [
+                                                        "$lastBattle",
+                                                        "$firstBattle",
+                                                    ]
+                                                },
+                                                0,
+                                            ]
+                                        },
+                                        0,
+                                        {
+                                            "$divide": [
+                                                {
+                                                    "$subtract": [
+                                                        "$lastDamage",
+                                                        "$firstDamage",
+                                                    ]
+                                                },
+                                                {
+                                                    "$subtract": [
+                                                        "$lastBattle",
+                                                        "$firstBattle",
+                                                    ]
+                                                },
+                                            ]
+                                        },
+                                    ]
+                                },
+                                2,
+                            ]
+                        },
+                    }
+                }
+            )
+            pipeline.append(
+                {"$sort": {"damage": -1}},
+            )
+
+        else:
+            raise TypeError("Parameter not found")
+
+        pipeline.extend([{"$limit": limit}, {"$project": {"_id": 0}}])
+
+        res = cls.collection.aggregate(pipeline)
+        return await res.to_list()
 
 
 class Clan_all_sessions(Clan_sessions):

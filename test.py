@@ -1,61 +1,33 @@
-import asyncio
+import aiohttp
 from pymongo import MongoClient
-from aiohttp import ClientSession
-from utils.interfase.player import PlayerSession
+import asyncio
+import json
+from datetime import datetime, timedelta
 
-client = MongoClient("mongodb://localhost:27017/")
-client = client.test_db
-session = client["Session"]
-remote = MongoClient("mongodb://54.234.203.209:27017/")
-remote = remote.wotblitz
-remote_session = remote["Session"]
+claster = MongoClient("mongodb://localhost:27017/")
 
-
-def load_name() -> list[str]:
-    names = session.find(projection={"player_id": 1, "_id": 0})
-    remote_names = remote_session.find(projection={"player_id": 1, "_id": 0})
-    set_names = set(i.get("player_id") for i in names)
-    set_remote = set(i.get("player_id") for i in remote_names)
-    return list(set_names - set_remote)
+db = claster["wotblitz"]
+collection = db["Tank"]
 
 
-async def fetch(session: ClientSession, name):
-    async with session.get(
-        f"http://54.234.203.209/api/eu/player/get_session?name={name}"
-    ) as response:
-        if response.status != 200:
-            print(response.status)
-        res = await response.json()
-        if response.status == 404:
-            print(await response.json())
-        if res.get("susses") == "error":
-            print(res)
+async def load_data():
+    url = "https://api.wotblitz.eu/wotb/encyclopedia/vehicles/?application_id=ccef3112e27c6158fe49486193a53a65"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            data = await response.json()
+            return data
 
 
-async def main():
-    # data = load_name()
-    with open("tex.txt", "r") as f:
-        data = f.read().split("\n")
-    async with ClientSession() as session:
-        for name in data:
-            await fetch(session, name)
-            print(name)
-
-
-# if __name__ == "__main__":
-
-
-#     asyncio.run(main())
-# async def main():
-#     names = []
-#     for name in load_name():
-#         pl = PlayerSession(id=name, reg="eu")
-#         await pl.get_player_info()
-#         names.append(pl.user.name)
-#     with open("tex.txt", "w") as f:
-#         for name in names:
-#             f.write(f"{name}\n")
+def main():
+    data = asyncio.run(load_data())
+    with open("data.json", "w") as f:
+        json.dump(data, f, indent=4)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    s = datetime.now() - timedelta(days=7)
+    print(s)
+    s = datetime.now().timestamp() - (
+        datetime.now().timestamp() - timedelta(days=1).total_seconds()
+    )
+    print(s)

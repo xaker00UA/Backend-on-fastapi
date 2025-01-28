@@ -188,7 +188,7 @@ class Rating(BaseModel, Session):
                 return None
             result = {}
             for field, value in vars(self).items():
-                if isinstance(value, (int, float)):
+                if not isinstance(value, bool) and isinstance(value, (int, float)):
                     result[field] = abs(getattr(self, field) - getattr(other, field))
             return self.model_copy(update=result)
         else:

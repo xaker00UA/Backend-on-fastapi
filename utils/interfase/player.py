@@ -1,5 +1,6 @@
 from asyncio import gather
 import asyncio
+from datetime import datetime, timedelta
 from itertools import zip_longest
 
 from utils.models.respnse_model import General, RestUser
@@ -64,7 +65,7 @@ class PlayerSession:
             data = await self.session.get_general(self.user)
         except RequestError as e:
             message = str(e)
-            if "INVALID access_token" in message:
+            if "INVALID_ACCESS_TOKEN" in message:
                 self.user.access_token = None
                 data = await self.session.get_general(self.user)
             else:
@@ -79,30 +80,27 @@ class PlayerSession:
             message = str(e)
             if "INVALID_ACCESS_TOKEN" in message:
                 self.user.access_token = None
-                data = await self.session.get_general(self.user)
+                data = await self.session.get_details_tank(self.user)
             else:
                 raise RequestError(message)
         self.user = data
 
-    async def _results(self):
-        try:
-            await self.get_player_DB()
-        except NotFoundPlayerDB:
-            await self.session.get_id(self.user.region, self.user.name)
-            raise NotFoundPlayerDB(
-                name=self.name,
-                player_id=self.id,
-                region=self.region,
-                access_token=self.user.access_token,
-            )
+    async def _results(self, trigger: bool = True):
+        if trigger:
+            try:
+                await self.get_player_DB()
+            except NotFoundPlayerDB:
+                player_id = await self.session.get_id(self.user.region, self.user.name)
+                self.id = player_id
+                await self.get_player_DB()
 
-        self.user: UserDB = await self.session.get_details_tank(self.old_user)
+            self.user: UserDB = await self.session.get_details_tank(self.old_user)
         user = self.user - self.old_user
         model = user.result()
         return model
 
-    async def results(self) -> RestPlayer:
-        session = await self._results()
+    async def results(self, trigger: bool = True) -> RestPlayer:
+        session = await self._results(trigger=trigger)
         now = await self._now_stats()
         update = await self._update_stats()
         if now.tanks.now:
@@ -172,9 +170,27 @@ class PlayerSession:
     async def get_session(self) -> dict:
         pass
 
+    async def get_period(self, start_day: int, end_day: int) -> RestUser:
+        await self.get_player_DB()
+        self.user = await Player_all_sessions.get(self.user, end_day)
+        if not self.user:
+            raise NotFoundPeriod(self.name)
+        self.old_user = await Player_all_sessions.get(self.user, start_day)
+        if not self.old_user:
+            raise NotFoundPeriod(self.name)
+        return await self.results(trigger=False)
+
     @classmethod
     async def get_token(self, region, redirect_url):
         return await self.session.get_token(redirect_url=redirect_url, reg=region)
+
+    @classmethod
+    async def top_players(cls, limit, parameter, start_day):
+        return await Player_all_sessions.get_top(
+            limit=limit,
+            parameter=parameter,
+            start_day=start_day,
+        )
 
     @classmethod
     async def update_db(cls):

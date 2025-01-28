@@ -49,6 +49,12 @@ class NotFoundPlayerDB(BaseCustomException):
         super().__init__(self.message)
 
 
+class NotFoundPeriod(BaseCustomException):
+    def __init__(self, name: str):
+        self.message = f"Игрок {name} не отлслеживаеться так долго"
+        super().__init__(self.message)
+
+
 class NotFoundClanDB(BaseCustomException):
     def __init__(self, clan_name: str):
         # Формируем сообщение об ошибке, включая имя клана

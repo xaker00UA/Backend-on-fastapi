@@ -211,7 +211,7 @@ class APIServer(Singleton):
         res = UserDB(
             region=reg,
             player_id=player_id,
-            name=user.name,
+            name=gen.name,
             access_token=token,
             acount=PlayerDetails(**data, **gen.acount.model_dump()),
         )

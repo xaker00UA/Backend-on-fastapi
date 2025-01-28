@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from enum import Enum
 from functools import wraps
 import hashlib
@@ -6,6 +7,7 @@ from collections import OrderedDict
 
 from fastapi import APIRouter, HTTPException, Request, BackgroundTasks, logger, Depends
 from fastapi.responses import RedirectResponse, JSONResponse
+from pydantic import BaseModel
 
 from utils.error.exception import BaseCustomException
 
@@ -58,6 +60,12 @@ class RegionEnum(str, Enum):
     na = "na"
 
 
+class ParameterEnum(str, Enum):
+    battles = "battles"
+    wins = "wins"
+    damage = "damage"
+
+
 router = APIRouter(tags=["player"])
 
 
@@ -87,6 +95,19 @@ async def search(player_name):
     raise HTTPException(status_code=404, detail="Player not found")
 
 
+@router.get("/top_players")
+async def top_players(
+    limit: int = 10,
+    parameter="battles",
+    start_day: int = int(
+        datetime.now().timestamp() - timedelta(days=7).total_seconds()
+    ),
+):
+    return await PlayerSession.top_players(
+        limit=limit, parameter=parameter, start_day=start_day
+    )
+
+
 stats = APIRouter(prefix="/{region}/player", tags=["stats"])
 
 
@@ -111,6 +132,18 @@ async def get_session(region, name, background_tasks: BackgroundTasks) -> RestUs
     except NotFoundPlayerDB:
         background_tasks.add_task(PlayerSession(name=name, reg=region).add_player)
         return {"susses": "error", "message": "Player add db"}
+    except BaseCustomException as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(e)
+        raise HTTPException(status_code=500)
+
+
+@cache_method
+@stats.get("/period")
+async def get_period(region, name, start_day: int, end_day: int):
+    try:
+        return await PlayerSession(name=name, reg=region).get_period(start_day, end_day)
     except BaseCustomException as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
