@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wotblitz"
-version = "1.3"
+version = "1.4"
 description = "Бекенд для управления сессия игроков вотблиц"
 authors = ["Ivan <ivanbozhkod@gmail.com>"]
 readme = "README.md"
