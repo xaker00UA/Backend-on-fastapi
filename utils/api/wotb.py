@@ -114,6 +114,7 @@ class APIServer(Singleton):
     @timer
     async def fetch(self, url, parser=True):
         await self.limiter.wait()
+        LoggerFactory.debug(name="api", message=f"url={url}")
         async with self.session.get(url) as response:
             await self.parse_status(response)
             if parser:
@@ -123,10 +124,10 @@ class APIServer(Singleton):
 
     async def fetch_post(self, url, body):
         await self.limiter.wait()
+        LoggerFactory.debug(name="api", message=f"url={url}")
         async with self.session.post(url, json=body) as response:
             await self.parse_status(response)
             return await response.json()
-        pass
 
     async def get_user_id(self, user: UserDB) -> tuple[int, str]:
         player_id = user.player_id
