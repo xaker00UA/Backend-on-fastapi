@@ -79,7 +79,7 @@ game_api:
       ?application_id=<app_id>\
       &redirect_uri=<redirect_url>\
       &nofollow=1"
-
+    longer_token: "https://api.worldoftanks.<reg_url>/wot/auth/prolongate/"
     get_position_rating: "https://<reg_url>.wotblitz.com/uk/api/rating-leaderboards/user/<player_id>"
 
     logout: "https://api.worldoftanks.<reg_url>/wot/auth/logout/\

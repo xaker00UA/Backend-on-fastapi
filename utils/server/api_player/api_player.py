@@ -5,7 +5,15 @@ import hashlib
 from time import time
 from collections import OrderedDict
 
-from fastapi import APIRouter, HTTPException, Request, BackgroundTasks, logger, Depends
+from fastapi import (
+    APIRouter,
+    Cookie,
+    HTTPException,
+    Request,
+    BackgroundTasks,
+    logger,
+    Depends,
+)
 from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -92,7 +100,7 @@ async def search(player_name):
     res = await PlayerSession(name=player_name).get_players()
     if res:
         return res
-    raise HTTPException(status_code=404, detail="Player not found")
+    raise NotFoundPlayerDB(name=player_name)
 
 
 @router.get("/top_players")
@@ -113,15 +121,11 @@ stats = APIRouter(prefix="/{region}/player", tags=["stats"])
 
 @cache_method
 @stats.get("/get_general", response_model=RestUser)
-async def get_general(region, name):
-    try:
-        data = await PlayerSession(name=name, reg=region).get_player_info()
-        return data.result("now")
-    except BaseCustomException as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error(e)
-        raise HTTPException(status_code=500)
+async def get_general(region, name, access_token: str = Cookie("access_token")):
+    data = await PlayerSession(
+        name=name, reg=region, access_token=access_token
+    ).get_player_info()
+    return data.result("now")
 
 
 @cache_method
@@ -131,24 +135,13 @@ async def get_session(region, name, background_tasks: BackgroundTasks) -> RestUs
         return await PlayerSession(name=name, reg=region).results()
     except NotFoundPlayerDB:
         background_tasks.add_task(PlayerSession(name=name, reg=region).add_player)
-        return {"susses": "error", "message": "Player add db"}
-    except BaseCustomException as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error(e)
-        raise HTTPException(status_code=500)
+        raise NotFoundPlayerDB(region=region, name=name)
 
 
 @cache_method
 @stats.get("/period")
 async def get_period(region, name, start_day: int, end_day: int):
-    try:
-        return await PlayerSession(name=name, reg=region).get_period(start_day, end_day)
-    except BaseCustomException as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error(e)
-        raise HTTPException(status_code=500)
+    return await PlayerSession(name=name, reg=region).get_period(start_day, end_day)
 
 
 stats.include_router(router=player_router_socket, tags=["WebSocket"])

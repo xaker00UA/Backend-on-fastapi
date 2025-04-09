@@ -2,7 +2,6 @@ from aiohttp import ClientSession, ClientResponse
 from asynciolimiter import Limiter
 import asyncio
 import time
-
 from utils.models import UserDB, Singleton, PlayerDetails
 from utils.models.clan import Clan, ClanDetails
 from utils.api.cache import Cache
@@ -12,8 +11,7 @@ from utils.settings.config import Config, EnvConfig
 from utils.error.exception import PlayerNotFound
 import atexit
 
-LIMIT = 20
-Count = 1
+from ..settings.logger import LoggerFactory
 
 
 def timer(func):
@@ -26,12 +24,9 @@ def timer(func):
             raise
         finally:
             end_time = time.time()
-            global Count
-
-            print(
-                f"Count={Count} Function {func.__name__} took {end_time - start_time} seconds to execute"
+            LoggerFactory.debug(
+                f"Function {func.__name__} took {end_time - start_time} seconds to execute"
             )
-            Count += 1
 
     return wrapper
 
@@ -40,13 +35,13 @@ class APIServer(Singleton):
 
     def __init__(self):
         if not hasattr(self, "initialized"):
-            self.limiter = Limiter(LIMIT)
+            self._config = Config().get()
+            self.limiter = Limiter(EnvConfig.LIMIT)
             self.session = ClientSession()
             self._session = self.session
             self._players_stats = []
             self.exact = True
             self.cache = Cache()
-            self._config = Config().get()
             self.player_stats = {}
             self.player = {}
 
@@ -80,6 +75,8 @@ class APIServer(Singleton):
                 raise Exception("Redirect")
             case status if 400 <= status < 500:
                 raise RequestError("Not found")
+            case 504:
+                raise ServerIsTemporarilyUnavailable()
             case status if 500 <= status:
                 raise Exception("Server error")
             case _:
@@ -92,9 +89,21 @@ class APIServer(Singleton):
 
         if status_response:
             if data["status"] != "ok":
-                raise RequestError(
-                    f"{data["error"]['message']}",
-                )
+                message = data["error"]["message"]
+                value = data["error"].get("value")
+                match message:
+                    case "INVALID_ACCESS_TOKEN":
+                        raise InvalidAccessToken(value=value)
+                    case "INVALID_IP_ADDRESS":
+                        raise InvalidIpAddress(value=value)
+                    case "REQUEST_LIMIT_EXCEEDED":
+                        raise RequestLimitExceeded(value)
+                    case "APPLICATION_IS_BLOCKED":
+                        raise ApplicationIsBlocked(value)
+                    case "SOURCE_NOT_AVAILABLE":
+                        raise ServerIsTemporarilyUnavailable
+                    case _:
+                        raise RequestError(message=message, value=value)
         if count:
             if data["meta"]["count"] == 0:
                 raise PlayerNotFound(
@@ -111,6 +120,13 @@ class APIServer(Singleton):
                 return await self.parse_response(response)
             else:
                 return await response.json()
+
+    async def fetch_post(self, url, body):
+        await self.limiter.wait()
+        async with self.session.post(url, json=body) as response:
+            await self.parse_status(response)
+            return await response.json()
+        pass
 
     async def get_user_id(self, user: UserDB) -> tuple[int, str]:
         player_id = user.player_id
@@ -163,18 +179,19 @@ class APIServer(Singleton):
             .replace("<access_token>", str(token if token else ""))
         )
         data = await self.fetch(url)
-        # rating = await self.get_raring(user)
-        data = data["data"][str(player_id)]
-        # data["statistics"]["rating"].update(rating)
-        general = PlayerModel(**data)
-        res = UserDB(
-            region=reg,
-            player_id=player_id,
-            acount=general,
-            name=data["nickname"],
-            access_token=token,
-        )
-        return res
+        if data and data["data"][str(player_id)]:
+            data = data["data"][str(player_id)]
+            general = PlayerModel(**data)
+            res = UserDB(
+                region=reg,
+                player_id=player_id,
+                acount=general,
+                name=data["nickname"],
+                access_token=token,
+            )
+            return res
+        else:
+            raise NoUpdatePlayer(user=user)
 
     async def get_details_tank(self, user: UserDB, rating=True) -> UserDB:
         player_id, reg = await self.get_user_id(user)
@@ -194,7 +211,7 @@ class APIServer(Singleton):
         ]
         if rating:
             tasks.append(asyncio.create_task(self.get_rating(user), name="get_rating"))
-        done, pending = await asyncio.wait(tasks, timeout=5)
+        done, pending = await asyncio.wait(tasks)
         results = {}
         for task in done:
             results[task.get_name()] = task.result()
@@ -203,11 +220,16 @@ class APIServer(Singleton):
             results[task.get_name()] = None
             task.cancel()
         data = results.get("fetch")
+
+        if data["data"][str(player_id)] is None:
+            raise NoUpdatePlayer(user=user)
+
+        data["tanks"] = data["data"][str(player_id)]
         gen = results.get("get_general")
         rat = results.get("get_rating")
-        data["tanks"] = data["data"][str(player_id)]
         if rat:
             gen = gen.model_copy(update={"account": {"statistics": {"rating": rating}}})
+
         res = UserDB(
             region=reg,
             player_id=player_id,
@@ -227,7 +249,6 @@ class APIServer(Singleton):
             .replace("<player_id>", str(player_id))
         )
         data = await self.fetch(url)
-        print(data)
         # FIXME: надо чтобы возрщало модель медалей и не было ошибки при большем количестве
         # FIXME: параметров желетально чтобы даже изменяло модель на основе самого
         # FIXME: большого количества параметров
@@ -243,6 +264,21 @@ class APIServer(Singleton):
         data = await self.fetch(url)
         data = data["data"]["location"]
         return data
+
+    async def longer_token(self, user: UserDB):
+        reg = self._get_url_by_reg(user.region)
+        url_template = self._config.game_api.urls.longer_token
+        url = url_template.replace("<reg_url>", reg)
+        body = {
+            "application_id": self._get_id_by_reg(reg),
+            "access_token": user.access_token,
+        }
+        data = await self.fetch_post(url, body=body)
+        if data["status"] == "ok":
+            user.access_token = data["data"]["access_token"]
+            return user.access_token
+        else:
+            return user
 
     async def logout(self, req, token):
         req = self._get_url_by_reg(req)

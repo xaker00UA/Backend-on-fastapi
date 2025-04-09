@@ -1,12 +1,11 @@
 from asyncio import gather
+
+from utils.settings.logger import LoggerFactory
 from ..models.clan import Clan, ClanDB, ClanDetails, RestClan
 from ..database.Mongo import Clan_sessions, Clan_all_sessions
 from ..api.wotb import APIServer
 from .player import PlayerSession
 from ..error import *
-import logging
-
-logger = logging.getLogger()
 
 
 class ClanInterface:
@@ -19,6 +18,9 @@ class ClanInterface:
         self.region = region
         self.session = APIServer()
         self.player_interface = PlayerSession
+        LoggerFactory.debug(
+            f"Клан с параметрами tag={self.tag}, clan_id={self.clan_id}, name={self.name}, region={self.region}"
+        )
 
     async def get_clan_info(self) -> Clan:
         res = await self.session.get_clan_info(
@@ -73,11 +75,14 @@ class ClanInterface:
 
     @classmethod
     async def update_db(cls):
-        logger.info("Start update clan db")
+        LoggerFactory.info("Start update clan db")
         async for batch in Clan_sessions.find_all():
             for clan in batch:
                 clan = await cls(
                     name=clan.name, region=clan.region, clan_id=clan.clan_id
                 ).get_clan_details()
-                await Clan_all_sessions.add(clan)
-        logger.info("End update clan db")
+                await gather(
+                    *[Clan_all_sessions.add(clan), Clan_sessions.add(clan)],
+                    return_exceptions=True,
+                )
+        LoggerFactory.info("End update clan db")

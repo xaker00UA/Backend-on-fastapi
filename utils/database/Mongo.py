@@ -5,6 +5,8 @@ from motor.motor_asyncio import (
     AsyncIOMotorCursor,
 )
 import os
+
+from utils.settings.logger import LoggerFactory
 from ..models import UserDB, Tank
 from ..models.clan import ClanDB
 
@@ -71,7 +73,7 @@ class Player_sessions(Connect):
         return [UserDB.model_validate(doc) for doc in res]
 
     @classmethod
-    async def find_all(cls) -> AsyncGenerator[list, None]:
+    async def find_all(cls) -> AsyncGenerator[list[UserDB], None]:
         cursor: AsyncIOMotorCursor = cls.collection.find()
         batch_size = 100
 
@@ -147,9 +149,9 @@ class Player_all_sessions(Player_sessions):
     collection: AsyncIOMotorCollection = Connect.db["Session_all"]
 
     @classmethod
-    async def add(cls, user: UserDB) -> UserDB:
-        await cls.collection.insert_one(user.model_dump())
-        return user
+    async def add(cls, user: list[UserDB]) -> UserDB:
+        users = [i.model_dump() for i in user]
+        await cls.collection.insert_many(users)
 
     @classmethod
     async def get(cls, user: UserDB, timestamp_ago: int) -> UserDB:
@@ -196,6 +198,20 @@ class Player_all_sessions(Player_sessions):
             pipeline.append({"$sort": {"battles": -1}})
 
         elif parameter == "wins":
+            pipeline.append(
+                {
+                    "$match": {
+                        "$expr": {
+                            "$gt": [
+                                {
+                                    "$subtract": ["$lastBattle", "$firstBattle"]
+                                },  # Разница между боем
+                                20,  # Фильтруем записи, где разница больше 20
+                            ]
+                        }
+                    }
+                }
+            )
             pipeline.append(
                 {
                     "$project": {
@@ -249,6 +265,20 @@ class Player_all_sessions(Player_sessions):
             pipeline.append({"$sort": {"wins": -1}})
 
         elif parameter == "damage":
+            pipeline.append(
+                {
+                    "$match": {
+                        "$expr": {
+                            "$gt": [
+                                {
+                                    "$subtract": ["$lastBattle", "$firstBattle"]
+                                },  # Разница между боем
+                                20,  # Фильтруем записи, где разница больше 20
+                            ]
+                        }
+                    }
+                }
+            )
             pipeline.append(
                 {
                     "$project": {
@@ -329,6 +359,7 @@ class Tank_DB(Connect):
             res["level"] = res.pop("tier")
         else:
             res = {"level": "undefined", "name": "undefined"}
+            LoggerFactory.warn(f"Танк не найден с параметрами id={id}")
         return res
 
     @classmethod
@@ -336,12 +367,14 @@ class Tank_DB(Connect):
         res = await cls.collection.find({"tank_id": {"$in": id}}).to_list(length=None)
 
         # Преобразование полученных данных в словарь
+        for item in res:
+            item["level"] = item.pop("tier")
         data = {item["tank_id"]: item for item in res}
-
         # Для каждого ID, для которого нет данных, добавляем дефолтный словарь
         for tank_id in id:
             if tank_id not in data:
                 data[tank_id] = {"level": "undefined", "name": "undefined"}
+                LoggerFactory.warn(f"Танк не найден с параметрами id={tank_id}")
 
         return data
 

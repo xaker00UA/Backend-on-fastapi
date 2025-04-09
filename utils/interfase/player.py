@@ -1,6 +1,4 @@
 from asyncio import gather
-import asyncio
-from datetime import datetime, timedelta
 from itertools import zip_longest
 
 from utils.models.respnse_model import General, RestUser
@@ -15,9 +13,9 @@ from ..models import (
 from ..database.Mongo import Player_sessions, Tank_DB, Player_all_sessions
 from ..api.wotb import APIServer
 from ..error import *
-import logging
 
-logger = logging.getLogger()
+
+from ..settings.logger import LoggerFactory
 
 
 class PlayerSession:
@@ -42,6 +40,9 @@ class PlayerSession:
         )
         self.old_user: UserDB | None = None
         self.settings = None
+        LoggerFactory.debug(
+            f"Пользователь с параметрами: name={self.name}, id={self.id}, region={self.region}, access_token={access_token}"
+        )
 
     async def add_player(self):
         await self.get_player_details()
@@ -63,26 +64,19 @@ class PlayerSession:
     async def get_player_info(self) -> UserDB:
         try:
             data = await self.session.get_general(self.user)
-        except RequestError as e:
-            message = str(e)
-            if "INVALID_ACCESS_TOKEN" in message:
-                self.user.access_token = None
-                data = await self.session.get_general(self.user)
-            else:
-                raise RequestError(message)
+        except InvalidAccessToken as e:
+            self.user.access_token = None
+            data = await self.session.get_general(self.user)
         self.user = data
         return self.user
 
     async def get_player_details(self, rating=True):
         try:
             data = await self.session.get_details_tank(self.user, rating=rating)
-        except RequestError as e:
-            message = str(e)
-            if "INVALID_ACCESS_TOKEN" in message:
-                self.user.access_token = None
-                data = await self.session.get_details_tank(self.user)
-            else:
-                raise RequestError(message)
+        except InvalidAccessToken as e:
+            self.user.access_token = None
+            data = await self.session.get_details_tank(self.user)
+
         self.user = data
 
     async def _results(self, trigger: bool = True):
@@ -172,7 +166,7 @@ class PlayerSession:
 
     async def get_period(self, start_day: int, end_day: int) -> RestUser:
         await self.get_player_DB()
-        self.user = await Player_all_sessions.get(self.user, end_day)
+        self.user = await Player_all_sessions.get(self.old_user, end_day)
         if not self.user:
             raise NotFoundPeriod(self.name)
         self.old_user = await Player_all_sessions.get(self.user, start_day)
@@ -194,22 +188,38 @@ class PlayerSession:
 
     @classmethod
     async def update_db(cls):
-        logger.info("Start update players DB")
+        LoggerFactory.info("Start update players DB")
         async for batch in Player_sessions.find_all():
             tasks = []
             users = []
-            semaphore = asyncio.Semaphore(10)
-
-            async def semaphore_task(task):
-                async with semaphore:
-                    await task
 
             for user in batch:
-                user = cls(name=user.name, reg=user.region, id=user.player_id)
-                users.append(user)
+                user = cls(
+                    name=user.name,
+                    reg=user.region,
+                    id=user.player_id,
+                    access_token=user.access_token,
+                )
                 tasks.append(user.get_player_details(rating=False))
+                users.append(user)
+            update_users = await gather(*tasks, return_exceptions=True)
+            for i in update_users:
+                if isinstance(i, Exception):
+                    LoggerFactory.error(i)
+            await Player_all_sessions.add([user.user for user in users])
+        LoggerFactory.info("End update players DB")
 
-            for task in asyncio.as_completed([semaphore_task(task) for task in tasks]):
-                await task
-            await gather(*[Player_all_sessions.add(user.user) for user in users])
-        logger.info("End update players DB")
+    @classmethod
+    async def update_player_token(cls):
+        async for batch in Player_sessions.find_all():
+            tasks = []
+
+            for user in batch:
+                if user.access_token is None:
+                    continue
+                tasks.append(cls.session.longer_token(user))
+            updated_players = await gather(*tasks)
+
+            await gather(
+                *[Player_sessions.update(player) for player in updated_players]
+            )

@@ -8,15 +8,7 @@ router = APIRouter(tags=["clan"])
 
 @router.get("/{region}/clan/", response_model=RestClan)
 async def get_clan_session(region, name):
-    try:
-        return await ClanInterface(name=name, region=region).results()
-
-    except BaseCustomException as e:
-        raise HTTPException(status_code=404, detail=str(e))  # 404 - не найдено
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Internal server error: {str(e)}"
-        )  # 500 - ошибка сервера
+    return await ClanInterface(name=name, region=region).results()
 
 
 @router.get("/clan/search")
@@ -24,4 +16,4 @@ async def search_clan(name):
     res = await ClanInterface(name=name).get_clans()
     if res:
         return res
-    raise HTTPException(status_code=404, detail="Clan not found")
+    raise ClanNotFound(name=name)

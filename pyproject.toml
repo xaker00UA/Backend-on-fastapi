@@ -12,6 +12,10 @@ motor = "^3.6.0"
 fastapi = {extras = ["all"], version = "^0.115.6"}
 asynciolimiter = "^1.1.1"
 apscheduler = "^3.11.0"
+sqlalchemy = "^2.0.38"
+passlib = "^1.7.4"
+python-jose = "^3.4.0"
+black = "^25.1.0"
 
 
 [build-system]

@@ -48,6 +48,7 @@ class Urls(BaseModel, StrMixin):
     get_clan_stats: str
     get_tank_stats: str
     get_token: str
+    longer_token: str
     get_position_rating: str
     logout: str
     search_clan: str
