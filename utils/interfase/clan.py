@@ -45,7 +45,10 @@ class ClanInterface:
             self.player_interface(id=player_id, reg=self.region).get_player_info()
             for player_id in res.members_ids
         ]
-        data = await gather(*task)
+        data = await gather(*task, return_exceptions=True)
+        data = [
+            result for result in data if not isinstance(result, BaseCustomException)
+        ]
         data = [user.acount for user in data]
         return ClanDB(**res.model_dump(), members=data, region=self.region)
 

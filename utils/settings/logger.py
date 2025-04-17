@@ -30,25 +30,25 @@ class JsonFormatter(logging.Formatter):
         if hasattr(record, "method"):
             log_record["method"] = record.method
         # Если есть exc_info — это лог исключения
-        if record.exc_info:
-            # log_record["exception"] = self.formatException(record.exc_info)
+        # if record.exc_info:
+        #     # log_record["exception"] = self.formatException(record.exc_info)
 
-            # Извлекаем стек ошибки
-            tb = record.exc_info[2]
-            if tb:
-                last_trace = traceback.extract_tb(tb)[-1]
-                log_record["file"] = last_trace.filename
-                log_record["line"] = last_trace.lineno
-                log_record["func"] = last_trace.name
-            else:
-                log_record["file"] = "Unknown"
-                log_record["line"] = 0
-                log_record["func"] = "Unknown"
+        #     # Извлекаем стек ошибки
+        #     tb = record.exc_info[2]
+        #     if tb:
+        #         last_trace = traceback.extract_tb(tb)[-1]
+        #         log_record["file"] = last_trace.filename
+        #         log_record["line"] = last_trace.lineno
+        #         log_record["func"] = last_trace.name
+        #     else:
+        #         log_record["file"] = "Unknown"
+        #         log_record["line"] = 0
+        #         log_record["func"] = "Unknown"
         # else:
         #     # Обычное логирование — просто откуда вызван лог
-        #     log_record["file"] = record.pathname
-        #     log_record["line"] = record.lineno
-        #     log_record["func"] = record.funcName
+        log_record["file"] = record.caller_file
+        log_record["line"] = record.caller_line
+        log_record["func"] = record.caller_func
 
         return json.dumps(log_record, ensure_ascii=False)
 
@@ -105,7 +105,7 @@ class LoggerFactory(Singleton):
                 encoding="utf-8",
             )
             api_handler.setFormatter(JsonFormatter())
-            api_handler.setLevel(logging.INFO)
+            api_handler.setLevel(logging.DEBUG)
             logger.addHandler(api_handler)
 
         # --- Для root логгера (основное приложение) ---
@@ -156,7 +156,11 @@ class LoggerFactory(Singleton):
         line_number = caller.lineno
         func_name = caller.function
 
-        return {"file": filename, "line": line_number, "func": func_name}
+        return {
+            "caller_file": filename,
+            "caller_line": line_number,
+            "caller_func": func_name,
+        }
 
     @classmethod
     def debug(cls, message: str, name: str | None = None, extra: dict | None = None):
