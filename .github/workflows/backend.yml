@@ -1,10 +1,10 @@
-name: Build and Deploy Backend
+name: Deploy Backend
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - master
     tags:
       - '*'
 
@@ -13,36 +13,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
+      - name: Checkout repository
+        uses: actions/checkout@v3
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
       - name: Add host to known_hosts
         run: ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Copy code to EC2 using SCP
+      
+      - name: Deploy backend to EC2
         run: |
-          scp -r ./ ec2-user@${{ secrets.EC2_HOST }}:app/backend
-
-
-      - name: Deploy to EC2
-        run: |
-          REF=${{ github.ref }}
-          REF_NAME=${{ github.ref_name }}
           ssh ec2-user@${{ secrets.EC2_HOST }} << EOF
-            cd /app/backend
-
-            if [[ "$REF" == refs/tags/* ]]; then
-              IMAGE_TAG="$REF_NAME"
-            else
-              IMAGE_TAG="latest"
-            fi
-
-            docker build -t backend:\$IMAGE_TAG .
+            cd app
+            rm -rf backend && mkdir -p backend
+            cd backend
+            git clone -b master https://github.com/${{ github.repository }}.git .
+            docker build -t backend:stable .
             cd ../
-            docker-compose up -d --build backend
+            docker-compose up  -d --build 
           EOF
