@@ -140,8 +140,10 @@ class LoggerFactory(Singleton):
             error_handler.setLevel(logging.ERROR)
             logger.addHandler(error_handler)
 
+        libs_to_silence = ["pymongo", "apscheduler"]
+
         for name in logging.root.manager.loggerDict:
-            if name.startswith("pymongo"):
+            if any(name.startswith(lib) for lib in libs_to_silence):
                 logging.getLogger(name).setLevel(logging.CRITICAL + 1)
                 logging.getLogger(name).propagate = False
 

@@ -4,6 +4,8 @@ from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from passlib.context import CryptContext
 from sqlalchemy.orm import sessionmaker, Session
+
+from utils.settings.logger import LoggerFactory
 from ..settings.config import EnvConfig
 from jose import JWTError, jwt, ExpiredSignatureError
 from fastapi import HTTPException, Cookie, status
@@ -58,7 +60,7 @@ def initialize_db():
             session.commit()
         except Exception:
             session.rollback()
-        print("Superuser root created")
+        LoggerFactory.info("Superuser root created")
 
 
 # Утилиты
