@@ -1,7 +1,7 @@
 from asyncio import gather
 
 from utils.settings.logger import LoggerFactory
-from ..models.clan import Clan, ClanDB, ClanDetails, RestClan
+from ..models.clan import Clan, ClanDB, ClanDetails, ClanTop, RestClan
 from ..database.Mongo import Clan_sessions, Clan_all_sessions
 from ..api.wotb import APIServer
 from .player import PlayerSession
@@ -75,6 +75,13 @@ class ClanInterface:
 
     async def get_clans(self) -> list:
         return await Clan_sessions.gets(self.name)
+
+    @classmethod
+    async def get_top_list_clan(cls, end_day, start_day, limit) -> list:
+        data = await Clan_all_sessions.get_top(
+            end_day=end_day, start_day=start_day, limit=limit
+        )
+        return [ClanTop.model_validate(i) for i in data]
 
     @classmethod
     async def update_db(cls):

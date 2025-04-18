@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, field_serializer
 
 from utils.models.tank import PlayerModel
 from .respnse_model import RestClan, RestMember
@@ -66,3 +66,22 @@ class ClanDB(BaseModel, Session):
 
     def result() -> RestClan:
         pass
+
+
+class ClanTop(BaseModel):
+    region: str
+    name: str
+    clan_id: int
+    tag: str
+    general_battles: int
+    general_wins: float
+    averageDamage: float
+    rating: float
+
+    @field_validator("rating", mode="before")
+    def round_rating(cls, v):
+        return round(v, 4)
+
+    @field_validator("general_wins", mode="before")
+    def valid_wins(cls, v):
+        return 100 * v
