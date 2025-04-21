@@ -1,17 +1,14 @@
-from dataclasses import dataclass, field
 from pydantic import BaseModel, computed_field
 from typing import Optional
-from .base_models import Session
-from .configmodel import StrMixin
-from .respnse_model import (
+from utils.models.base_models import Session
+from utils.models.configmodel import StrMixin
+from utils.models.respnse_model import (
     General,
     ItemTank,
-    RestMember,
     RestPrivate,
     RestRating,
     RestStatistics,
     RestStatsTank,
-    BaseStats,
     RestUser,
 )
 
@@ -150,7 +147,7 @@ class Private(BaseModel, Session):
             res = {}
             for field, value in vars(self).items():
                 if field not in ["ban_info", "ban_time", "is_premium"]:
-                    res[field] = abs(value - getattr(other, field))
+                    res[field] = value - getattr(other, field)
             return self.model_copy(update=res)
 
     def result(self):
@@ -259,6 +256,7 @@ class PlayerModel(BaseModel, Session, StrMixin):
                 general = General(now=self.statistics.result())
             case "update":
                 general = General(update=self.statistics.result())
+
         return RestUser(
             id=self.account_id,
             name=self.nickname,

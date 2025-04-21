@@ -2,7 +2,8 @@ from aiohttp import ClientSession, ClientResponse
 from asynciolimiter import Limiter
 import asyncio
 import time
-from utils.models import UserDB, Singleton, PlayerDetails
+from utils.models.base_models import Singleton
+from utils.models.player import UserDB, PlayerDetails
 from utils.models.clan import Clan, ClanDetails
 from utils.api.cache import Cache
 from utils.error.exception import *

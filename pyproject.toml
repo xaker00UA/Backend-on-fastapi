@@ -1,23 +1,32 @@
-[tool.poetry]
+[project]
 name = "wotblitz"
 version = "1.4"
-description = "Бекенд для управления сессия игроков вотблиц"
-authors = ["Ivan <ivanbozhkod@gmail.com>"]
+description = "Бекенд для управления сессиями игроков вотблиц"
 readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Ivan", email = "ivanbozhkod@gmail.com" }]
 
-[tool.poetry.dependencies]
-python = "^3.12"
-aiohttp = "^3.11.11"
-motor = "^3.6.0"
-fastapi = {extras = ["all"], version = "^0.115.6"}
-asynciolimiter = "^1.1.1"
-apscheduler = "^3.11.0"
-sqlalchemy = "^2.0.38"
-passlib = "^1.7.4"
-python-jose = "^3.4.0"
-black = "^25.1.0"
-
+dependencies = [
+    "aiohttp>=3.11.11,<4.0.0",
+    "motor>=3.6.0,<4.0.0",
+    "fastapi[all]>=0.115.6,<1.0.0",
+    "asynciolimiter>=1.1.1,<2.0.0",
+    "apscheduler>=3.11.0,<4.0.0",
+    "sqlalchemy>=2.0.38,<3.0.0",
+    "passlib>=1.7.4,<2.0.0",
+    "python-jose>=3.4.0,<4.0.0",
+    "black>=25.1.0,<26.0.0"
+]
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.test.dependencies]
+requests = "^2.32.3"
+
+[project.scripts]
+medal = "run:medal"
+tank = "run.py"
+
+

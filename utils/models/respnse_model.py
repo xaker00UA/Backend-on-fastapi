@@ -1,5 +1,5 @@
-from pydantic import BaseModel, SerializeAsAny
-from typing import Union
+from enum import Enum
+from pydantic import BaseModel, model_validator
 
 
 class BaseStats(BaseModel):
@@ -48,10 +48,18 @@ class RestStatistics(BaseModel):
         return {"all": None, "rating": None}
 
 
+class Images(BaseModel):
+    preview: str | None = None
+    normal: str | None = None
+
+
 class ItemTank(BaseModel):
     all: RestStatsTank | None = None
+    nation: str = "undefined"
+    images: Images = Images()
     name: str = "undefined"
     level: int | str = "undefined"
+    is_premium: bool = False
     last_battle_time: int = 0
     tank_id: int
 
@@ -124,13 +132,16 @@ class RestPrivate(BaseModel):
             )
 
 
-class RestUser(BaseModel):
-    id: int | None = None
-    name: str | None = None
-    region: str | None = None
-    time: int | str | None = None
+class RestUserDB(BaseModel):
+    region: "Region" = "Region.eu"
+    name: str
+    player_id: int
+
+
+class RestUser(RestUserDB):
+    time: int = 1
     private: RestPrivate | None = None
-    general: General | None = None
+    general: General
     tanks: General | None = None
 
     def __sub__(self, other):
@@ -163,4 +174,85 @@ class RestClan(BaseModel):
     tag: str
     members_count: int
     members: list[RestMember]
+    general: BaseStats = BaseStats()
     time: int | str | None
+
+
+class ErrorResponse(BaseModel):
+    detail: str
+
+
+class Region(str, Enum):
+    eu = "eu"
+    asia = "asia"
+    com = "com"
+    na = "na"
+
+
+class Parameter(str, Enum):
+    battles = "battles"
+    wins = "wins"
+    damage = "damage"
+
+
+class LoginForm(BaseModel):
+    username: str
+    password: str
+
+
+class Commands(Enum):
+    reset = "!reset_user"
+    reset_clan = "!reset_clan"
+    delete = "!delete_user"
+    delete_clan = "!delete_clan"
+    update_player_db = "!update_player_db"
+    update_clan_db = "!update_clan_db"
+
+
+class Command(BaseModel):
+    command: Commands
+    region: Region | None = None
+    arguments: str = ""
+
+    def run(self):
+        if hasattr(self, "task"):
+            return self.task
+
+    @model_validator(mode="after")
+    def convector(self):
+        self.region = (
+            self.region.value if isinstance(self.region, Region) else self.region
+        )
+        return self
+
+    @model_validator(mode="after")
+    def valid(self):
+        from utils.interfase.clan import ClanInterface
+        from utils.interfase.player import PlayerSession
+
+        if self.command == Commands.reset:
+            self.task = PlayerSession(name=self.arguments, reg=self.region).reset()
+        elif self.command == Commands.reset_clan:
+            self.task = ClanInterface(region=self.region, tag=self.arguments).reset()
+        elif self.command == Commands.update_player_db:
+            self.task = PlayerSession.update_db()
+        elif self.command == Commands.update_clan_db:
+            self.task = ClanInterface.update_db()
+        elif self.command == Commands.delete:
+            # Замените на нужное действие
+            self.task = ...
+        elif self.command == Commands.delete_clan:
+            # Замените на нужное действие
+            self.task = ...
+        else:
+            raise TypeError("Invalid command")
+        return self
+
+
+class AuthLogin(BaseModel):
+    success: str = "ok"
+    url: str
+
+
+class AuthVerify(BaseModel):
+    isAuthenticated: bool = False

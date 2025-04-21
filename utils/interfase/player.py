@@ -2,12 +2,9 @@ from asyncio import gather
 from itertools import zip_longest
 
 from utils.models.respnse_model import General, RestUser
-from ..models import (
+from ..models.player import (
     PlayerDetails,
     UserDB,
-    Tank,
-    Rating,
-    PlayerModel,
     RestPlayer,
 )
 from ..database.Mongo import Player_sessions, Tank_DB, Player_all_sessions

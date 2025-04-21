@@ -73,7 +73,7 @@ class ClanInterface:
         res = await Clan_sessions.add(res)
         return res
 
-    async def get_clans(self) -> list:
+    async def get_clans(self) -> list[ClanDB]:
         return await Clan_sessions.gets(self.name)
 
     @classmethod

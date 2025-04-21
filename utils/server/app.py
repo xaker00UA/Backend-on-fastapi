@@ -5,6 +5,8 @@ from fastapi.middleware import Middleware
 
 
 from fastapi.responses import JSONResponse
+
+from utils.models.respnse_model import ErrorResponse
 from .auth import router as auth_router
 from .api_player import router as player_router, stats as player_stats
 from .api_clan.api_clan import router as clan_router
@@ -54,7 +56,16 @@ mid = [
 ]
 
 
-app = FastAPI(title="Authentication", lifespan=lifespan, middleware=mid)
+app = FastAPI(
+    title="Authentication",
+    lifespan=lifespan,
+    servers=[{"url": "http://localhost:8000"}, {"url": "http://localhost:3000"}],
+    middleware=mid,
+    responses={
+        code: {"model": ErrorResponse, "description": msg}
+        for _, (code, msg) in EXCEPTION_HANDLERS.items()
+    },
+)
 app.include_router(auth_router)
 app.include_router(player_router)
 app.include_router(player_stats)

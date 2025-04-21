@@ -1,13 +1,10 @@
-from dataclasses import dataclass, field
 from datetime import datetime
 from pydantic import BaseModel, Field
-from collections import Counter
 from decimal import Decimal
 
-from utils.error.exception import NoUpdatePlayer, NoUpdateTank, ValidError
 from utils.models.respnse_model import General, RestUser
-from .base_models import Data_class, Session
-from .tank import Tank, StatsTank, PlayerModel, Rating
+from utils.models.base_models import Session
+from utils.models.tank import Tank, StatsTank, PlayerModel, Rating
 
 
 class PlayerDetails(PlayerModel, Session):
@@ -16,10 +13,6 @@ class PlayerDetails(PlayerModel, Session):
     def __sub__(self, other) -> object:
         data = super().__sub__(other)
         data = data.model_dump()
-        # if (self.general and other.general) is not None:
-        #     general = self.general - other.general
-        # else:
-        #     general = None
         tanks = []
         other_tanks = {element.tank_id: element for element in other.tanks}
         self_tanks = {element.tank_id: element for element in self.tanks}

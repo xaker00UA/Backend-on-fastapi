@@ -8,7 +8,7 @@ from motor.motor_asyncio import (
 
 from .helper import get_clan_rating_pipeline
 from utils.settings.logger import LoggerFactory
-from ..models import UserDB, Tank
+from ..models.player import UserDB, Tank
 from ..models.clan import ClanDB
 
 
@@ -69,7 +69,7 @@ class Player_sessions(Connect):
     async def gets(cls, user: UserDB) -> list[UserDB]:
         res = await cls.collection.find(
             filter={"name": {"$regex": user.name, "$options": "i"}},
-            projection={"name": 1, "_id": 0, "region": 1},
+            projection={"name": 1, "_id": 0, "region": 1, "player_id": 1},
         ).to_list(length=10)
         return [UserDB.model_validate(doc) for doc in res]
 

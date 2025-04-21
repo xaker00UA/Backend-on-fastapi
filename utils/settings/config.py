@@ -1,6 +1,7 @@
 import os
 import yaml
-from ..models import ConfigStructure, Singleton
+from ..models.configmodel import ConfigStructure
+from ..models.base_models import Singleton
 
 
 class Config(Singleton):
