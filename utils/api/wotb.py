@@ -38,16 +38,21 @@ class APIServer(Singleton):
         if not hasattr(self, "initialized"):
             self._config = Config().get()
             self.limiter = Limiter(EnvConfig.LIMIT)
-            self.session = ClientSession()
+            self.session = None
             self._session = self.session
             self._players_stats = []
             self.exact = True
             self.cache = Cache()
             self.player_stats = {}
             self.player = {}
-
+            # self.init_session()
             self.initialized = True
-            atexit.register(self.close)
+            # atexit.register(self.sync_close)
+
+    async def init_session(self):
+        if self.session is None:
+            self.session = ClientSession()
+            self._session = self.session
 
     def _get_url_by_reg(self, reg: str):
         match reg.lower():
@@ -357,8 +362,12 @@ class APIServer(Singleton):
         data = await self.fetch(url)
         return ClanDetails(**data["data"][str(clan_id)])
 
-    def close(self):
-        asyncio.run(self.session.close())
+    # def close(self):
+    #     asyncio.run(self.session.close())
 
-    def __del__(self):
-        self.close()
+    async def close(self):
+        if self.session:
+            await self.session.close()
+
+    # def __del__(self):
+    #     self.close()

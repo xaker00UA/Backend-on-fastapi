@@ -2,7 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from decimal import Decimal
 
-from utils.models.respnse_model import General, RestUser
+from utils.models.respnse_model import General, Region, RestUser
 from utils.models.base_models import Session
 from utils.models.tank import Tank, StatsTank, PlayerModel, Rating
 
@@ -62,7 +62,7 @@ class UserDB(BaseModel, Session):
 
     def result(self, type="session") -> RestUser:
         model = self.acount.result(type=type)
-        model.region = self.region
+        model.region = Region(self.region)
         model.time = self.timestamp
         return model
 

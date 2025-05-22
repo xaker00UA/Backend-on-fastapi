@@ -29,26 +29,10 @@ class JsonFormatter(logging.Formatter):
             log_record["duration"] = round(record.duration, 4)
         if hasattr(record, "method"):
             log_record["method"] = record.method
-        # Если есть exc_info — это лог исключения
-        # if record.exc_info:
-        #     # log_record["exception"] = self.formatException(record.exc_info)
 
-        #     # Извлекаем стек ошибки
-        #     tb = record.exc_info[2]
-        #     if tb:
-        #         last_trace = traceback.extract_tb(tb)[-1]
-        #         log_record["file"] = last_trace.filename
-        #         log_record["line"] = last_trace.lineno
-        #         log_record["func"] = last_trace.name
-        #     else:
-        #         log_record["file"] = "Unknown"
-        #         log_record["line"] = 0
-        #         log_record["func"] = "Unknown"
-        # else:
-        #     # Обычное логирование — просто откуда вызван лог
-        log_record["file"] = record.caller_file
-        log_record["line"] = record.caller_line
-        log_record["func"] = record.caller_func
+        # log_record["file"] = record.caller_file
+        # log_record["line"] = record.caller_line
+        # log_record["func"] = record.caller_func
 
         return json.dumps(log_record, ensure_ascii=False)
 
@@ -140,7 +124,7 @@ class LoggerFactory(Singleton):
             error_handler.setLevel(logging.ERROR)
             logger.addHandler(error_handler)
 
-        libs_to_silence = ["pymongo", "apscheduler"]
+        libs_to_silence = ["pymongo", "apscheduler", "scheduler"]
 
         for name in logging.root.manager.loggerDict:
             if any(name.startswith(lib) for lib in libs_to_silence):

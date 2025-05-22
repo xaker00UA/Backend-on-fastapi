@@ -5,6 +5,7 @@ from utils.models.configmodel import StrMixin
 from utils.models.respnse_model import (
     General,
     ItemTank,
+    Region,
     RestPrivate,
     RestRating,
     RestStatistics,
@@ -91,7 +92,10 @@ class StatsTank(BaseModel, Session):
                 res = {}
                 for attrs in vars(self):
                     res[attrs] = abs(getattr(self, attrs) - getattr(other, attrs))
-                return self.model_copy(update=res)
+                res = self.model_copy(update=res)
+                if res.battles == 0:
+                    return None
+                return res
         else:
             return NotImplemented
 
@@ -187,6 +191,8 @@ class Rating(BaseModel, Session):
             for field, value in vars(self).items():
                 if not isinstance(value, bool) and isinstance(value, (int, float)):
                     result[field] = abs(getattr(self, field) - getattr(other, field))
+            if result["battles"] == 0:
+                return None
             return self.model_copy(update=result)
         else:
             raise TypeError("Ожидается объект класса %s", self.__class__.__name__)
@@ -227,8 +233,6 @@ class PlayerModel(BaseModel, Session, StrMixin):
     statistics: Statistics
     last_battle_time: int = 0
 
-    # OPTIMIZE: private.__sub__()
-
     def __sub__(self, other):
         if super().__sub__(other):
             update = abs(self.last_battle_time - other.last_battle_time)
@@ -258,7 +262,8 @@ class PlayerModel(BaseModel, Session, StrMixin):
                 general = General(update=self.statistics.result())
 
         return RestUser(
-            id=self.account_id,
+            region=Region("eu"),
+            player_id=self.account_id,
             name=self.nickname,
             private=private,
             general=general,

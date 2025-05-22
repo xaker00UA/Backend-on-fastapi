@@ -25,7 +25,7 @@ class Config(Singleton):
 
 class EnvConfig:
     LIMIT = int(os.getenv("LIMIT", "10"))
-    WG_APP_IDS = os.getenv("WG_APP_IDS", "ccef3112e27c6158fe49486193a53a65")
+    WG_APP_IDS = os.getenv("WG_APP_IDS", "6af85f38c69d69fc6c392514dc642129")
     LT_APP_IDS = os.getenv("LT_APP_IDS")
     SECRET_KEY = os.getenv("SECRET_KEY", "SECRET_KEY")
     ALGORITHM = os.getenv("ALGORITHM", "HS256")

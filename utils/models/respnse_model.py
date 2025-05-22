@@ -1,17 +1,25 @@
 from enum import Enum
-from pydantic import BaseModel, model_validator
+from typing import Callable
+from pydantic import BaseModel, PrivateAttr, model_validator, Field
+
+
+class Region(str, Enum):
+    eu = "eu"
+    asia = "asia"
+    com = "com"
+    na = "na"
 
 
 class BaseStats(BaseModel):
-    battles: int = 0
-    winrate: float = 0
-    damage: float = 0
-    accuracy: float = 0
-    survival: float = 0
-    avg_xp: float = 0
-    wins_and_survived: float = 0
-    murder_to_murder: float = 0
-    damage_coefficient: float = 0
+    battles: int = Field(default=0)
+    winrate: float = Field(default=0)
+    damage: float = Field(default=0)
+    accuracy: float = Field(default=0)
+    survival: float = Field(default=0)
+    avg_xp: float = Field(default=0)
+    wins_and_survived: float = Field(default=0)
+    murder_to_murder: float = Field(default=0)
+    damage_coefficient: float = Field(default=0)
 
     def __sub__(self, other):
         if isinstance(other, BaseStats):
@@ -25,7 +33,7 @@ class BaseStats(BaseModel):
 
 
 class RestStatsTank(BaseStats):
-    profit_coefficient: float = 0
+    profit_coefficient: float = Field(default=0)
 
 
 class RestRating(BaseStats):
@@ -111,6 +119,12 @@ class General(BaseModel):
             return self.model_copy(update=data)
 
 
+class GeneralTanks(General):
+    update: list[ItemTank] | None = None
+    now: list[ItemTank] | None = None
+    session: list[ItemTank] | None = None
+
+
 class RestPrivate(BaseModel):
     gold: int = 0
     free_xp: int = 0
@@ -133,7 +147,7 @@ class RestPrivate(BaseModel):
 
 
 class RestUserDB(BaseModel):
-    region: "Region" = "Region.eu"
+    region: Region
     name: str
     player_id: int
 
@@ -142,7 +156,7 @@ class RestUser(RestUserDB):
     time: int = 1
     private: RestPrivate | None = None
     general: General
-    tanks: General | None = None
+    tanks: GeneralTanks | None = None
 
     def __sub__(self, other):
         if isinstance(other, RestUser):
@@ -182,13 +196,6 @@ class ErrorResponse(BaseModel):
     detail: str
 
 
-class Region(str, Enum):
-    eu = "eu"
-    asia = "asia"
-    com = "com"
-    na = "na"
-
-
 class Parameter(str, Enum):
     battles = "battles"
     wins = "wins"
@@ -214,9 +221,11 @@ class Command(BaseModel):
     region: Region | None = None
     arguments: str = ""
 
-    def run(self):
-        if hasattr(self, "task"):
-            return self.task
+    _task: Callable | None = PrivateAttr(default=None)
+
+    async def run(self):
+        if self._task:
+            return await self._task
 
     @model_validator(mode="after")
     def convector(self):
@@ -231,19 +240,19 @@ class Command(BaseModel):
         from utils.interfase.player import PlayerSession
 
         if self.command == Commands.reset:
-            self.task = PlayerSession(name=self.arguments, reg=self.region).reset()
+            self._task = PlayerSession(name=self.arguments, reg=self.region).reset()
         elif self.command == Commands.reset_clan:
-            self.task = ClanInterface(region=self.region, tag=self.arguments).reset()
+            self._task = ClanInterface(region=self.region, tag=self.arguments).reset()
         elif self.command == Commands.update_player_db:
-            self.task = PlayerSession.update_db()
+            self._task = PlayerSession.update_db()
         elif self.command == Commands.update_clan_db:
-            self.task = ClanInterface.update_db()
+            self._task = ClanInterface.update_db()
         elif self.command == Commands.delete:
             # Замените на нужное действие
-            self.task = ...
+            self._task = ...
         elif self.command == Commands.delete_clan:
             # Замените на нужное действие
-            self.task = ...
+            self._task = ...
         else:
             raise TypeError("Invalid command")
         return self
@@ -255,4 +264,9 @@ class AuthLogin(BaseModel):
 
 
 class AuthVerify(BaseModel):
-    isAuthenticated: bool = False
+    isAuthenticated: bool
+
+
+class TopPlayer(RestUserDB):
+    parameter: Parameter
+    value: float | int

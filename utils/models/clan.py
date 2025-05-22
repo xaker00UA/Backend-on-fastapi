@@ -46,7 +46,9 @@ class ClanDB(BaseModel, Session):
 
         def weighted_sum(attr: str) -> float:
             return sum(
-                getattr(s.general.all, attr) * s.general.all.battles for s in members
+                getattr(s.general.all, attr) * s.general.all.battles
+                for s in members
+                if (s.general.all)
             )
 
         return BaseStats(
@@ -80,7 +82,7 @@ class ClanDB(BaseModel, Session):
                 res = res.result()
                 if res.general.session.all or res.general.session.rating:
                     result = RestMember(
-                        id=res.id,
+                        id=res.player_id,
                         nickname=res.name,
                         general=res.general.session,
                         last_battle_time=0,
@@ -91,7 +93,7 @@ class ClanDB(BaseModel, Session):
             return RestClan(
                 members=members,
                 time=timestamp,
-                members_count=len(members),
+                members_count=self.members_count,
                 general=self.sum_general(members),
                 **data,
             )

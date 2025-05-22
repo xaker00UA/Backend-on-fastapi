@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta
 from functools import wraps
 import hashlib
@@ -16,60 +17,28 @@ from ..api_socket import player_router_socket
 from ..auth import require_authentication
 
 from ...interfase.player import PlayerSession
-from ...models.respnse_model import Parameter, Region, RestUser, RestUserDB
+from ...models.respnse_model import Parameter, Region, RestUser, RestUserDB, TopPlayer
 from ...error import NotFoundPlayerDB
-
-
-def cache_method(ttl=60, max_cache_size=100):
-    def cache_wrapper(method):
-        cache = OrderedDict()
-
-        @wraps(method)
-        async def wrapper(self, *args, **kwargs):
-            kwargs_filtered = {
-                key: value
-                for key, value in kwargs.items()
-                if not isinstance(value, BackgroundTasks)
-            }
-            key = hashlib.md5(f"{args}{kwargs_filtered}".encode()).hexdigest()
-            current_time = round(time())
-            expired_keys = [k for k, v in cache.items() if v["ttl"] <= current_time]
-            for k in expired_keys:
-                cache.pop(k)
-            if key in cache and cache[key]["ttl"] > current_time:
-                return cache[key]["result"]
-
-            result = await method(self, *args, **kwargs)
-
-            cache[key] = {"result": result, "ttl": current_time + ttl}
-            if len(cache) > max_cache_size:
-                cache.popitem(last=False)  # Remove the oldest item
-            return result
-
-        return wrapper
-
-    return cache_wrapper
 
 
 router = APIRouter(tags=["player"])
 
 
 @router.get("/player")
-async def player(token=Depends(require_authentication)):
+async def player(token=Depends(require_authentication)) -> RestUserDB:
     player = PlayerSession(access_token=token)
     await player.get_player_DB()
-    user = player.old_user
-    reg, name = user.region, user.name
-    return JSONResponse({"region": reg, "nickname": name})
+    user = RestUserDB.model_validate(player.old_user, from_attributes=True)
+    return user
 
 
 @router.get("/reset")
 async def reset(
     background_tasks: BackgroundTasks, token=Depends(require_authentication)
-):
+) -> bool:
     player = PlayerSession(access_token=token)
     background_tasks.add_task(player.reset)
-    return JSONResponse({"susses": "ok"})
+    return True
 
 
 @router.get("/search")
@@ -89,7 +58,7 @@ async def top_players(
     start_day: int = int(
         datetime.now().timestamp() - timedelta(days=7).total_seconds()
     ),
-):
+) -> list[TopPlayer]:
     return await PlayerSession.top_players(
         limit=limit, parameter=parameter, start_day=start_day
     )
@@ -98,7 +67,6 @@ async def top_players(
 stats = APIRouter(prefix="/{region}/player", tags=["stats"])
 
 
-@cache_method
 @stats.get("/get_general", response_model=RestUser)
 async def get_general(
     region: Region, name: str, access_token: str = Cookie("access_token")
@@ -109,7 +77,6 @@ async def get_general(
     return data.result("now")
 
 
-@cache_method
 @stats.get("/get_session", response_model=RestUser)
 async def get_session(
     region: Region, name: str, background_tasks: BackgroundTasks
@@ -117,11 +84,13 @@ async def get_session(
     try:
         return await PlayerSession(name=name, reg=region.value).results()
     except NotFoundPlayerDB:
-        background_tasks.add_task(PlayerSession(name=name, reg=region.value).add_player)
+        # await PlayerSession(name=name, reg=region.value).add_player()
+        # background_tasks.add_task()
+        asyncio.create_task(PlayerSession(name=name, reg=region.value).add_player())
+        # return
         raise NotFoundPlayerDB(region=region.value, name=name)
 
 
-@cache_method
 @stats.get("/period")
 async def get_period(region: Region, name: str, start_day: int, end_day: int):
     return await PlayerSession(name=name, reg=region.value).get_period(

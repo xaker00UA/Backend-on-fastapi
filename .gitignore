@@ -16,3 +16,4 @@ test.py
 data.json
 *.log
 *db
+.env

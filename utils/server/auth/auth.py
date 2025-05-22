@@ -13,6 +13,12 @@ from fastapi.responses import RedirectResponse, JSONResponse
 
 from utils.models.respnse_model import AuthLogin, AuthVerify, Region, RestUserDB
 from ...interfase.player import PlayerSession
+from utils.settings.logger import LoggerFactory
+
+
+def get_region(req: Request, region: str | None = Cookie(default=None)) -> str | None:
+    req
+    return region
 
 
 async def require_authentication(request: Request):
@@ -37,7 +43,7 @@ router = APIRouter(tags=["auth"])
 
 @router.get("/login/{region}", response_model=AuthLogin)
 async def login(region: Region, redirect_url: str, response: Response):
-    response.set_cookie("region", region, path="/", httponly=True)
+    response.set_cookie("region", region.value, path="/", httponly=True)
     url = await PlayerSession.get_token(region=region, redirect_url=redirect_url)
     return AuthLogin(url=url)
 
@@ -56,13 +62,16 @@ async def auth(
     access_token: str = Query(),
     nickname: str = Query(),
     account_id: int = Query(),
-    region: str = Cookie(),
+    region: str | None = Depends(get_region),
 ) -> RestUserDB:
     player = PlayerSession(
         name=nickname, id=account_id, reg=region, access_token=access_token
     )
     background_tasks.add_task(player.add_player)
-    response = JSONResponse(content=RestUserDB(**player.user.model_dump()))
+
+    LoggerFactory.info(message=f"region:{region}")
+    LoggerFactory.info(message=f"player:{player.user.model_dump()}")
+    response = JSONResponse(content=RestUserDB(**player.user.model_dump()).model_dump())
     response.delete_cookie("region")
     response.set_cookie("access_token", access_token, httponly=True, path="/")
     return response
@@ -70,4 +79,8 @@ async def auth(
 
 @router.get("/auth/verify")
 async def auth_verify_token(access_token: str = Cookie(None)) -> AuthVerify:
-    return AuthVerify(True) if access_token else AuthVerify
+    return (
+        AuthVerify(isAuthenticated=True)
+        if access_token
+        else AuthVerify(isAuthenticated=False)
+    )

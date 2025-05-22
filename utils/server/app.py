@@ -1,4 +1,6 @@
+import traceback
 from typing import Callable
+import warnings
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware import Middleware
@@ -20,20 +22,35 @@ from ..database.admin import initialize_db
 from .middleware import ExceptionLoggingMiddleware
 from ..error.exception import *
 from ..settings.logger import LoggerFactory
+from ..api.wotb import APIServer
+
+scheduler = AsyncIOScheduler()
+scheduler.configure({"coalesce": True, "misfire_grace_time": 60})
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global scheduler
     initialize_db()
-    scheduler = AsyncIOScheduler()
+    server = APIServer()
+    await server.init_session()
     trigger = CronTrigger(hour=12, minute=00, second=00)
-    trigger_clan = CronTrigger(week=1, day_of_week="mon", hour=12, minute=00)
-    scheduler.add_job(PlayerSession.update_db, trigger=trigger)
-    scheduler.add_job(ClanInterface.update_db, trigger=trigger_clan)
-    scheduler.add_job(PlayerSession.update_player_token, trigger=trigger_clan)
+    trigger_clan = CronTrigger(day_of_week="mon", hour=12, minute=00)
+    scheduler.add_job(
+        PlayerSession.update_db, trigger=trigger, misfire_grace_time=3600 * 6
+    )
+    scheduler.add_job(
+        ClanInterface.update_db, trigger=trigger_clan, misfire_grace_time=3600 * 6
+    )
+    scheduler.add_job(
+        PlayerSession.update_player_token,
+        trigger=trigger_clan,
+        misfire_grace_time=3600 * 6,
+    )
     LoggerFactory.info("Start scheduler job")
     scheduler.start()
     yield
+    await server.close()
     LoggerFactory.info(
         "Waiting for the database update to complete before shutting down..."
     )
@@ -48,7 +65,7 @@ mid = [
     Middleware(ExceptionLoggingMiddleware),
     Middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -106,8 +123,18 @@ register_exception_handlers(app)
 
 @app.get("/")
 async def root(request: Request):
-
-    return {"message": "you is root"}
+    jobs = scheduler.get_jobs()
+    return [
+        {
+            "id": job.id,
+            "name": job.name,
+            "next_run_time": (
+                job.next_run_time.isoformat() if job.next_run_time else None
+            ),
+            "trigger": str(job.trigger),
+        }
+        for job in jobs
+    ]
 
 
 if __name__ == "__main__":

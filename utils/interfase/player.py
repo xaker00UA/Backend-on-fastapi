@@ -1,7 +1,9 @@
 from asyncio import gather
 from itertools import zip_longest
 
-from utils.models.respnse_model import General, RestUser
+from pydantic import BaseModel
+
+from utils.models.respnse_model import General, RestUser, TopPlayer
 from ..models.player import (
     PlayerDetails,
     UserDB,
@@ -80,12 +82,13 @@ class PlayerSession:
         if trigger:
             try:
                 await self.get_player_DB()
+                self.user.player_id = self.old_user.player_id
             except NotFoundPlayerDB:
                 player_id = await self.session.get_id(self.user.region, self.user.name)
                 self.id = player_id
                 await self.get_player_DB()
 
-            self.user: UserDB = await self.session.get_details_tank(self.old_user)
+            await self.get_player_details()
         user = self.user - self.old_user
         model = user.result()
         return model
@@ -98,9 +101,21 @@ class PlayerSession:
             tasks = [tank.tank_id for tank in now.tanks.now]
             data = await Tank_DB.get_list_id(tasks)
 
-            def update_object_with_data(obj):
-                if obj and obj.tank_id in data:
-                    obj.__dict__.update(data[obj.tank_id])
+            def update_object_with_data(obj: BaseModel, update=None):
+                if obj is None:
+                    return
+                if update is None and hasattr(obj, "tank_id") and obj.tank_id in data:
+                    update = data[obj.tank_id]
+                if not update:
+                    return
+                for key, value in update.items():
+                    if not hasattr(obj, key):
+                        continue
+                    current = getattr(obj, key)
+                    if isinstance(current, BaseModel) and isinstance(value, dict):
+                        update_object_with_data(current, value)
+                    else:
+                        setattr(obj, key, value)
 
             for ses, now_item, upd in zip_longest(
                 session.tanks.session,
@@ -177,11 +192,21 @@ class PlayerSession:
 
     @classmethod
     async def top_players(cls, limit, parameter, start_day):
-        return await Player_all_sessions.get_top(
+        data = await Player_all_sessions.get_top(
             limit=limit,
             parameter=parameter,
             start_day=start_day,
         )
+        return [
+            TopPlayer(
+                region=item.get("region"),  # type ignore
+                name=item.get("name"),
+                player_id=item.get("_id"),
+                parameter=parameter,  # type ignore
+                value=item.get(parameter),
+            )
+            for item in data
+        ]
 
     @classmethod
     async def update_db(cls):
@@ -208,6 +233,7 @@ class PlayerSession:
 
     @classmethod
     async def update_player_token(cls):
+        LoggerFactory.info("Start update player token")
         async for batch in Player_sessions.find_all():
             tasks = []
 
@@ -220,3 +246,4 @@ class PlayerSession:
             await gather(
                 *[Player_sessions.update(player) for player in updated_players]
             )
+        LoggerFactory.info("End update player token")

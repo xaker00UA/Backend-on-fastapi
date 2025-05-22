@@ -46,6 +46,7 @@ class Player_sessions(Connect):
 
     @classmethod
     async def add(cls, user: UserDB) -> UserDB:
+
         await cls.collection.replace_one(
             filter={"player_id": user.player_id},
             replacement=user.model_dump(),
@@ -193,6 +194,7 @@ class Player_all_sessions(Player_sessions):
                     "$project": {
                         "name": 1,
                         "region": 1,
+                        "_id": 1,
                         "battles": {"$subtract": ["$lastBattle", "$firstBattle"]},
                     }
                 },
@@ -238,7 +240,7 @@ class Player_all_sessions(Player_sessions):
         else:
             raise TypeError("Parameter not found")
 
-        pipeline += [{"$limit": limit}, {"$project": {"_id": 0}}]
+        pipeline += [{"$limit": limit}]
 
         res = cls.collection.aggregate(pipeline)
         return await res.to_list()
