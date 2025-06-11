@@ -1,6 +1,7 @@
 import os
 import yaml
-from ..models import ConfigStructure, Singleton
+from ..models.configmodel import ConfigStructure
+from ..models.base_models import Singleton
 
 
 class Config(Singleton):
@@ -24,10 +25,13 @@ class Config(Singleton):
 
 class EnvConfig:
     LIMIT = int(os.getenv("LIMIT", "10"))
-    WG_APP_IDS = os.getenv("WG_APP_IDS", "ccef3112e27c6158fe49486193a53a65")
+    WG_APP_IDS = os.getenv("WG_APP_IDS", "6af85f38c69d69fc6c392514dc642129")
     LT_APP_IDS = os.getenv("LT_APP_IDS")
     SECRET_KEY = os.getenv("SECRET_KEY", "SECRET_KEY")
     ALGORITHM = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "360"))
     SUPERUSER = os.getenv("SUPER_USER", "root")
     PASSWORD = os.getenv("PASSWORD", "root")
+    MONGO = os.getenv("MONGO", "mongodb://localhost:27017/")
+    NAME_DB = os.getenv("NAME_DB", "wotblitz")
+    REDIS = os.getenv("REDIS", "redis://localhost:6379")

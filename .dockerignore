@@ -12,3 +12,7 @@ exercise_1.py
 exercise_2.py
 OOP.py
 venv
+logs
+.test.env
+.env
+latest.Session.json

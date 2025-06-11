@@ -1,13 +1,10 @@
-from dataclasses import dataclass, field
 from datetime import datetime
 from pydantic import BaseModel, Field
-from collections import Counter
 from decimal import Decimal
 
-from utils.error.exception import NoUpdatePlayer, NoUpdateTank, ValidError
-from utils.models.respnse_model import General, RestUser
-from .base_models import Data_class, Session
-from .tank import Tank, StatsTank, PlayerModel, Rating
+from utils.models.response_model import General, Medals, Region, RestUser
+from utils.models.base_models import Session
+from utils.models.tank import Tank, StatsTank, PlayerModel
 
 
 class PlayerDetails(PlayerModel, Session):
@@ -16,10 +13,6 @@ class PlayerDetails(PlayerModel, Session):
     def __sub__(self, other) -> object:
         data = super().__sub__(other)
         data = data.model_dump()
-        # if (self.general and other.general) is not None:
-        #     general = self.general - other.general
-        # else:
-        #     general = None
         tanks = []
         other_tanks = {element.tank_id: element for element in other.tanks}
         self_tanks = {element.tank_id: element for element in self.tanks}
@@ -54,6 +47,8 @@ class UserDB(BaseModel, Session):
     player_id: int | None = None
     access_token: str | None = None
     acount: PlayerDetails | PlayerModel = None
+    medal: Medals = Medals()
+
     timestamp: int = Field(default_factory=lambda: int(datetime.now().timestamp()))
 
     def __sub__(self, other):
@@ -63,14 +58,16 @@ class UserDB(BaseModel, Session):
             update={
                 "acount": self.acount - other.acount,
                 "timestamp": self.timestamp - other.timestamp,
+                "medal": self.medal - other.medal,
             },
             deep=True,
         )
 
     def result(self, type="session") -> RestUser:
         model = self.acount.result(type=type)
-        model.region = self.region
+        model.region = Region(self.region)
         model.time = self.timestamp
+        model.medals = self.medal
         return model
 
 

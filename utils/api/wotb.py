@@ -1,15 +1,16 @@
 from aiohttp import ClientSession, ClientResponse
 from asynciolimiter import Limiter
+from prometheus_client import Counter
 import asyncio
 import time
-from utils.models import UserDB, Singleton, PlayerDetails
+from utils.models.base_models import Singleton
+from utils.models.player import UserDB, PlayerDetails
 from utils.models.clan import Clan, ClanDetails
 from utils.api.cache import Cache
 from utils.error.exception import *
 from utils.models.tank import PlayerModel
 from utils.settings.config import Config, EnvConfig
 from utils.error.exception import PlayerNotFound
-import atexit
 
 from ..settings.logger import LoggerFactory
 
@@ -24,8 +25,10 @@ def timer(func):
             raise
         finally:
             end_time = time.time()
-            LoggerFactory.debug(
-                f"Function {func.__name__} took {end_time - start_time} seconds to execute"
+            LoggerFactory.log(
+                f"Function {func.__name__} took {end_time - start_time} seconds to execute",
+                level="DEBUG",
+                channel="api",
             )
 
     return wrapper
@@ -37,16 +40,23 @@ class APIServer(Singleton):
         if not hasattr(self, "initialized"):
             self._config = Config().get()
             self.limiter = Limiter(EnvConfig.LIMIT)
-            self.session = ClientSession()
+            self.session = None
             self._session = self.session
             self._players_stats = []
             self.exact = True
             self.cache = Cache()
             self.player_stats = {}
             self.player = {}
-
             self.initialized = True
-            atexit.register(self.close)
+            self.external_api_counter = Counter(
+                "external_api_requests",
+                "Total requests to external APIs",
+            )
+
+    async def init_session(self):
+        if self.session is None:
+            self.session = ClientSession()
+            self._session = self.session
 
     def _get_url_by_reg(self, reg: str):
         match reg.lower():
@@ -114,7 +124,12 @@ class APIServer(Singleton):
     @timer
     async def fetch(self, url, parser=True):
         await self.limiter.wait()
-        LoggerFactory.debug(name="api", message=f"url={url}")
+        self.external_api_counter.inc()
+        LoggerFactory.log(
+            f"url={url}",
+            level="DEBUG",
+            channel="api",
+        )
         async with self.session.get(url) as response:
             await self.parse_status(response)
             if parser:
@@ -124,7 +139,12 @@ class APIServer(Singleton):
 
     async def fetch_post(self, url, body):
         await self.limiter.wait()
-        LoggerFactory.debug(name="api", message=f"url={url}")
+        self.external_api_counter.inc()
+        LoggerFactory.log(
+            f"url={url}",
+            level="DEBUG",
+            channel="api",
+        )
         async with self.session.post(url, json=body) as response:
             await self.parse_status(response)
             return await response.json()
@@ -140,12 +160,6 @@ class APIServer(Singleton):
             else:
                 player_id = player.player_id
         return player_id, reg
-
-    async def create_task(self):
-        pass
-
-    async def get_player_stats(self):
-        pass
 
     async def get_id(self, region, nickname):
         reg_url = self._get_url_by_reg(region)
@@ -212,7 +226,7 @@ class APIServer(Singleton):
         ]
         if rating:
             tasks.append(asyncio.create_task(self.get_rating(user), name="get_rating"))
-        done, pending = await asyncio.wait(tasks)
+        done, pending = await asyncio.wait(tasks, timeout=200)
         results = {}
         for task in done:
             results[task.get_name()] = task.result()
@@ -229,7 +243,21 @@ class APIServer(Singleton):
         gen = results.get("get_general")
         rat = results.get("get_rating")
         if rat:
-            gen = gen.model_copy(update={"account": {"statistics": {"rating": rating}}})
+            gen = gen.model_copy(
+                update={
+                    "acount": gen.acount.model_copy(
+                        update={
+                            "statistics": gen.acount.statistics.model_copy(
+                                update={
+                                    "rating": gen.acount.statistics.rating.model_copy(
+                                        update=rat
+                                    )
+                                }
+                            )
+                        }
+                    )
+                }
+            )
 
         res = UserDB(
             region=reg,
@@ -240,7 +268,7 @@ class APIServer(Singleton):
         )
         return res
 
-    async def get_medal(self, user):
+    async def get_medal(self, user) -> dict:
         player_id, reg = await self.get_user_id(user)
 
         url_template = self._config.game_api.urls.get_achievements
@@ -250,9 +278,7 @@ class APIServer(Singleton):
             .replace("<player_id>", str(player_id))
         )
         data = await self.fetch(url)
-        # FIXME: надо чтобы возрщало модель медалей и не было ошибки при большем количестве
-        # FIXME: параметров желетально чтобы даже изменяло модель на основе самого
-        # FIXME: большого количества параметров
+        return data["data"][str(player_id)]["achievements"]
 
     async def get_token(self, redirect_url, reg="eu") -> str:
         reg = self._get_url_by_reg(reg)
@@ -306,19 +332,6 @@ class APIServer(Singleton):
             number = 0
         return {"score": score, "number": number}
 
-    async def get_clan_id(self):
-        # TODO: реализовать функцию для клан айди
-        pass
-
-    async def get_members(self):
-        # TODO: реализовать функцию для получения игроков
-        pass
-
-    async def get_tank_api(self):
-        # TODO: реализовать функцию для получения информации о танках
-        # важно чтобы обновляло сущестующую бд а не заменяло ее так как не все даные есть в этом апи
-        pass
-
     async def get_clan_info(self, name, region) -> Clan:
         reg = self._get_url_by_reg(region)
         url_template = self._config.game_api.urls.search_clan
@@ -356,8 +369,6 @@ class APIServer(Singleton):
         data = await self.fetch(url)
         return ClanDetails(**data["data"][str(clan_id)])
 
-    def close(self):
-        asyncio.run(self.session.close())
-
-    def __del__(self):
-        self.close()
+    async def close(self):
+        if self.session:
+            await self.session.close()

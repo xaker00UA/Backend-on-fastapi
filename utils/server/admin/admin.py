@@ -1,83 +1,18 @@
-from enum import Enum
-from typing import Awaitable, Callable, Optional, Union
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     HTTPException,
     Response,
     status,
-    Cookie,
 )
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.requests import Request
 
-from ...interfase.clan import ClanInterface
-from ...interfase.player import PlayerSession
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-
+from utils.interfase.admin import MetricsInterface
+from utils.models.response_model import Command, LoginForm
+from prometheus_client import generate_latest
+from utils.server.admin.schemas import AdminStats
+from utils.settings.logger import LoggerFactory
 from ...database.admin import get_user, verify_password, create_access_token, valid
-
-import logging
-
-
-class Commands(Enum):
-    reset = "!reset_user"
-    reset_clan = "!reset_clan"
-    delete = "!delete_user"
-    delete_clan = "!delete_clan"
-    update_player_db = "!update_player_db"
-    update_clan_db = "!update_clan_db"
-
-
-class LoginForm(BaseModel):
-    username: str
-    password: str
-
-
-class Regions(Enum):
-    eu = "eu"
-    na = "na"
-    asia = "asia"
-
-
-class Command(BaseModel):
-    command: Commands
-    region: Regions | None = None
-    arguments: str = ""
-
-    task: Callable | None = Field(default=None)
-
-    def run(self):
-        if self.task:
-            return self.task
-
-    @model_validator(mode="after")
-    def convector(self):
-        self.region = (
-            self.region.value if isinstance(self.region, Regions) else self.region
-        )
-        return self
-
-    @model_validator(mode="after")
-    def valid(self):
-        if self.command == Commands.reset:
-            self.task = PlayerSession(name=self.arguments, reg=self.region).reset()
-        elif self.command == Commands.reset_clan:
-            self.task = ClanInterface(region=self.region, tag=self.arguments).reset()
-        elif self.command == Commands.update_player_db:
-            self.task = PlayerSession.update_db()
-        elif self.command == Commands.update_clan_db:
-            self.task = ClanInterface.update_db()
-        elif self.command == Commands.delete:
-            # Замените на нужное действие
-            self.task = ...
-        elif self.command == Commands.delete_clan:
-            # Замените на нужное действие
-            self.task = ...
-        else:
-            raise TypeError("Invalid command")
-        return self
 
 
 # FastAPI приложение
@@ -111,14 +46,17 @@ def logout(response: Response):
 
 @router.post("/commands")
 async def protected_route(commands: Command, current_user=Depends(valid)):
-    try:
-        await commands.run()
-        return {"command": "success"}
-    except Exception as e:
-        logging.getLogger(__name__).exception(e)
-        raise HTTPException(status_code=500, detail=str(e))
+
+    await commands.run()
+    return {"command": "success"}
 
 
 @router.get("/verify")
 async def verify_token(admin=Depends(valid)):
     return admin
+
+
+@router.get("/info", response_model=AdminStats)
+async def info(requests: Request, limit: int = 100, current_user=Depends(valid)):
+    service = MetricsInterface(requests.app.state.time)
+    return await service.collect_all(limit=limit)

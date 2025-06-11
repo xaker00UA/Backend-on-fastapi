@@ -1,17 +1,15 @@
-from dataclasses import dataclass, field
 from pydantic import BaseModel, computed_field
 from typing import Optional
-from .base_models import Session
-from .configmodel import StrMixin
-from .respnse_model import (
+from utils.models.base_models import Session
+from utils.models.configmodel import StrMixin
+from utils.models.response_model import (
     General,
     ItemTank,
-    RestMember,
+    Region,
     RestPrivate,
     RestRating,
     RestStatistics,
     RestStatsTank,
-    BaseStats,
     RestUser,
 )
 
@@ -94,7 +92,10 @@ class StatsTank(BaseModel, Session):
                 res = {}
                 for attrs in vars(self):
                     res[attrs] = abs(getattr(self, attrs) - getattr(other, attrs))
-                return self.model_copy(update=res)
+                res = self.model_copy(update=res)
+                if res.battles == 0:
+                    return None
+                return res
         else:
             return NotImplemented
 
@@ -150,7 +151,7 @@ class Private(BaseModel, Session):
             res = {}
             for field, value in vars(self).items():
                 if field not in ["ban_info", "ban_time", "is_premium"]:
-                    res[field] = abs(value - getattr(other, field))
+                    res[field] = value - getattr(other, field)
             return self.model_copy(update=res)
 
     def result(self):
@@ -188,8 +189,14 @@ class Rating(BaseModel, Session):
                 return None
             result = {}
             for field, value in vars(self).items():
-                if not isinstance(value, bool) and isinstance(value, (int, float)):
+                if (
+                    not isinstance(value, bool)
+                    and isinstance(value, (int, float))
+                    and not isinstance(getattr(other, field), type(None))
+                ):
                     result[field] = abs(getattr(self, field) - getattr(other, field))
+            if result["battles"] == 0:
+                return None
             return self.model_copy(update=result)
         else:
             raise TypeError("Ожидается объект класса %s", self.__class__.__name__)
@@ -230,8 +237,6 @@ class PlayerModel(BaseModel, Session, StrMixin):
     statistics: Statistics
     last_battle_time: int = 0
 
-    # OPTIMIZE: private.__sub__()
-
     def __sub__(self, other):
         if super().__sub__(other):
             update = abs(self.last_battle_time - other.last_battle_time)
@@ -259,8 +264,10 @@ class PlayerModel(BaseModel, Session, StrMixin):
                 general = General(now=self.statistics.result())
             case "update":
                 general = General(update=self.statistics.result())
+
         return RestUser(
-            id=self.account_id,
+            region=Region("eu"),
+            player_id=self.account_id,
             name=self.nickname,
             private=private,
             general=general,

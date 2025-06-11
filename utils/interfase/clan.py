@@ -18,8 +18,9 @@ class ClanInterface:
         self.region = region
         self.session = APIServer()
         self.player_interface = PlayerSession
-        LoggerFactory.debug(
-            f"Клан с параметрами tag={self.tag}, clan_id={self.clan_id}, name={self.name}, region={self.region}"
+        LoggerFactory.log(
+            f"Клан с параметрами tag={self.tag}, clan_id={self.clan_id}, name={self.name}, region={self.region}",
+            level="DEBUG",
         )
 
     async def get_clan_info(self) -> Clan:
@@ -73,7 +74,7 @@ class ClanInterface:
         res = await Clan_sessions.add(res)
         return res
 
-    async def get_clans(self) -> list:
+    async def get_clans(self) -> list[ClanDB]:
         return await Clan_sessions.gets(self.name)
 
     @classmethod
@@ -85,7 +86,7 @@ class ClanInterface:
 
     @classmethod
     async def update_db(cls):
-        LoggerFactory.info("Start update clan db")
+        LoggerFactory.log("Start update clan db")
         async for batch in Clan_sessions.find_all():
             for clan in batch:
                 clan = await cls(
@@ -95,4 +96,4 @@ class ClanInterface:
                     *[Clan_all_sessions.add(clan), Clan_sessions.add(clan)],
                     return_exceptions=True,
                 )
-        LoggerFactory.info("End update clan db")
+        LoggerFactory.log("End update clan db")

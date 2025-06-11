@@ -1,10 +1,16 @@
+from math import e
+import time
+import traceback
 from typing import Callable
+import warnings
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware import Middleware
 
 
 from fastapi.responses import JSONResponse
+
+from utils.models.response_model import ErrorResponse
 from .auth import router as auth_router
 from .api_player import router as player_router, stats as player_stats
 from .api_clan.api_clan import router as clan_router
@@ -18,21 +24,38 @@ from ..database.admin import initialize_db
 from .middleware import ExceptionLoggingMiddleware
 from ..error.exception import *
 from ..settings.logger import LoggerFactory
+from ..api.wotb import APIServer
+
+
+from loguru import logger
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    initialize_db()
     scheduler = AsyncIOScheduler()
-    trigger = CronTrigger(hour=12, minute=00, second=00)
-    trigger_clan = CronTrigger(week=1, day_of_week="mon", hour=12, minute=00)
-    scheduler.add_job(PlayerSession.update_db, trigger=trigger)
-    scheduler.add_job(ClanInterface.update_db, trigger=trigger_clan)
-    scheduler.add_job(PlayerSession.update_player_token, trigger=trigger_clan)
-    LoggerFactory.info("Start scheduler job")
+    initialize_db()
+    app.state.scheduler = scheduler
+    app.state.time = time.time()
+    server = APIServer()
+    await server.init_session()
+    trigger = CronTrigger(hour=12, minute=10, second=00)
+    trigger_clan = CronTrigger(day_of_week="mon", hour=12, minute=10)
+    scheduler.add_job(
+        PlayerSession.update_db, trigger=trigger, misfire_grace_time=3600 * 6
+    )
+    scheduler.add_job(
+        ClanInterface.update_db, trigger=trigger_clan, misfire_grace_time=3600 * 6
+    )
+    scheduler.add_job(
+        PlayerSession.update_player_token,
+        trigger=trigger_clan,
+        misfire_grace_time=3600 * 6,
+    )
+    LoggerFactory.log("Start scheduler job")
     scheduler.start()
     yield
-    LoggerFactory.info(
+    await server.close()
+    LoggerFactory.log(
         "Waiting for the database update to complete before shutting down..."
     )
     scheduler.shutdown(wait=True)  # Ожидаем завершения всех задач
@@ -46,7 +69,7 @@ mid = [
     Middleware(ExceptionLoggingMiddleware),
     Middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -54,7 +77,20 @@ mid = [
 ]
 
 
-app = FastAPI(title="Authentication", lifespan=lifespan, middleware=mid)
+app = FastAPI(
+    title="Authentication",
+    lifespan=lifespan,
+    servers=[
+        {"url": "http://localhost:8000", "description": "Local server API"},
+        {"url": "http://testserver.ua/api:80", "description": "Latest server API"},
+        {"url": "http://wotblstatic.com/api:80", "description": "Prod server API"},
+    ],
+    middleware=mid,
+    responses={
+        code: {"model": ErrorResponse, "description": msg}
+        for _, (code, msg) in EXCEPTION_HANDLERS.items()
+    },
+)
 app.include_router(auth_router)
 app.include_router(player_router)
 app.include_router(player_stats)
@@ -69,14 +105,17 @@ def create_exception_handler(status_code: int, initial_detail: str) -> Callable:
             message = exc.message
         else:
             message = initial_detail
+        logger.exception(f"Ошибка {type(exc).__name__}: {exc}")
 
         # Логирование ошибки
         if isinstance(exc, NoUpdateClan) or (exc, NoUpdatePlayer):
-            LoggerFactory.critical(exc, exc_info=True)
+            LoggerFactory.log(exc, level="CRITICAL")
+
         elif isinstance(exc, BaseCustomException):
-            LoggerFactory.error(exc, exc_info=True)
+            LoggerFactory.log(exc, level="ERROR")
+
         else:
-            LoggerFactory.error(exc, exc_info=True)
+            LoggerFactory.log(exc, level="CRITICAL")
 
         return JSONResponse(status_code=status_code, content={"detail": message})
 
@@ -94,9 +133,8 @@ register_exception_handlers(app)
 
 
 @app.get("/")
-async def root(request: Request):
-
-    return {"message": "you is root"}
+async def root(request: Request) -> str:
+    return "root"
 
 
 if __name__ == "__main__":

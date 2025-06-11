@@ -1,16 +1,17 @@
 from asyncio import gather
 from itertools import zip_longest
+import traceback
 
-from utils.models.respnse_model import General, RestUser
-from ..models import (
+from pydantic import BaseModel
+
+from utils.database.admin import add_active_user
+from utils.models.response_model import General, Medal, Medals, RestUser, TopPlayer
+from ..models.player import (
     PlayerDetails,
     UserDB,
-    Tank,
-    Rating,
-    PlayerModel,
     RestPlayer,
 )
-from ..database.Mongo import Player_sessions, Tank_DB, Player_all_sessions
+from ..database.Mongo import Player_sessions, Tank_DB, Player_all_sessions, Medal_DB
 from ..api.wotb import APIServer
 from ..error import *
 
@@ -40,8 +41,9 @@ class PlayerSession:
         )
         self.old_user: UserDB | None = None
         self.settings = None
-        LoggerFactory.debug(
-            f"Пользователь с параметрами: name={self.name}, id={self.id}, region={self.region}, access_token={access_token}"
+        LoggerFactory.log(
+            f"Пользователь с параметрами: name={self.name}, id={self.id}, region={self.region}, access_token={access_token}",
+            level="DEBUG",
         )
 
     async def add_player(self):
@@ -68,6 +70,7 @@ class PlayerSession:
             self.user.access_token = None
             data = await self.session.get_general(self.user)
         self.user = data
+        await self.get_player_medal()
         return self.user
 
     async def get_player_details(self, rating=True):
@@ -76,19 +79,34 @@ class PlayerSession:
         except InvalidAccessToken as e:
             self.user.access_token = None
             data = await self.session.get_details_tank(self.user)
-
         self.user = data
+        await self.get_player_medal()
+
+    async def get_player_medal(self):
+        data = await self.session.get_medal(self.user)
+        medal_db = await Medal_DB.get_list(list(data.keys()))
+        medals = []
+        for key, val in data.items():
+            image = medal_db.get(key)
+            if image is None or not isinstance(image, str):
+                image = "https://example.com/default-image.png"
+            medals.append(Medal(name=key, count=val, image=image))
+
+        medals = Medals(medals=medals)
+        self.user.medal = medals
 
     async def _results(self, trigger: bool = True):
         if trigger:
             try:
                 await self.get_player_DB()
+                self.user.player_id = self.old_user.player_id
             except NotFoundPlayerDB:
                 player_id = await self.session.get_id(self.user.region, self.user.name)
                 self.id = player_id
                 await self.get_player_DB()
 
-            self.user: UserDB = await self.session.get_details_tank(self.old_user)
+            await self.get_player_details()
+
         user = self.user - self.old_user
         model = user.result()
         return model
@@ -101,9 +119,21 @@ class PlayerSession:
             tasks = [tank.tank_id for tank in now.tanks.now]
             data = await Tank_DB.get_list_id(tasks)
 
-            def update_object_with_data(obj):
-                if obj and obj.tank_id in data:
-                    obj.__dict__.update(data[obj.tank_id])
+            def update_object_with_data(obj: BaseModel, update=None):
+                if obj is None:
+                    return
+                if update is None and hasattr(obj, "tank_id") and obj.tank_id in data:
+                    update = data[obj.tank_id]
+                if not update:
+                    return
+                for key, value in update.items():
+                    if not hasattr(obj, key):
+                        continue
+                    current = getattr(obj, key)
+                    if isinstance(current, BaseModel) and isinstance(value, dict):
+                        update_object_with_data(current, value)
+                    else:
+                        setattr(obj, key, value)
 
             for ses, now_item, upd in zip_longest(
                 session.tanks.session,
@@ -129,10 +159,20 @@ class PlayerSession:
         validated_data = General.model_validate(data)
         return session.model_copy(update={field_name: validated_data}, deep=True)
 
-    async def reset(self):
+    async def reset(self, isAdmin=False):
         await self.get_player_DB()
         self.user = await self.session.get_details_tank(self.old_user)
         await Player_sessions.add(self.user)
+        if not isAdmin:
+            data = {
+                "player_id": self.user.player_id,
+                "name": self.user.name,
+                "region": self.user.region,
+            }
+            add_active_user(**data)
+            LoggerFactory.log("User reset stats", extra=data)
+        else:
+            LoggerFactory.log("Admin reset stats", extra=data)
         return None
 
     async def _now_stats(self):
@@ -154,16 +194,6 @@ class PlayerSession:
     async def get_players(self) -> list[UserDB] | list:
         return await Player_sessions.gets(self.user)
 
-    async def top_players_server(self):
-        pass
-
-    async def _get_attributes(self):
-        self.attributes = await self.settings.get_params()
-        # TODO: Implement settings and attributes loading
-
-    async def get_session(self) -> dict:
-        pass
-
     async def get_period(self, start_day: int, end_day: int) -> RestUser:
         await self.get_player_DB()
         self.user = await Player_all_sessions.get(self.old_user, end_day)
@@ -180,15 +210,25 @@ class PlayerSession:
 
     @classmethod
     async def top_players(cls, limit, parameter, start_day):
-        return await Player_all_sessions.get_top(
+        data = await Player_all_sessions.get_top(
             limit=limit,
             parameter=parameter,
             start_day=start_day,
         )
+        return [
+            TopPlayer(
+                region=item.get("region"),  # type ignore
+                name=item.get("name"),
+                player_id=item.get("_id"),
+                parameter=parameter,  # type ignore
+                value=item.get(parameter),
+            )
+            for item in data
+        ]
 
     @classmethod
     async def update_db(cls):
-        LoggerFactory.info("Start update players DB")
+        LoggerFactory.log("Start update players DB")
         async for batch in Player_sessions.find_all():
             tasks = []
             users = []
@@ -205,12 +245,16 @@ class PlayerSession:
             update_users = await gather(*tasks, return_exceptions=True)
             for i in update_users:
                 if isinstance(i, Exception):
-                    LoggerFactory.error(i)
+                    print(i.with_traceback())
+                    print("Traceback:\n", traceback.format_exc())
+
+                    LoggerFactory.log(str(i), level="ERROR")
             await Player_all_sessions.add([user.user for user in users])
-        LoggerFactory.info("End update players DB")
+        LoggerFactory.log("End update players DB")
 
     @classmethod
     async def update_player_token(cls):
+        LoggerFactory.log("Start update player token")
         async for batch in Player_sessions.find_all():
             tasks = []
 
@@ -223,3 +267,4 @@ class PlayerSession:
             await gather(
                 *[Player_sessions.update(player) for player in updated_players]
             )
+        LoggerFactory.log("End update player token")

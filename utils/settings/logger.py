@@ -1,207 +1,164 @@
+from asyncio import ensure_future
 from datetime import datetime
-import inspect
-import logging
-from logging.handlers import RotatingFileHandler
 import sys
 import json
-import traceback
 from pathlib import Path
-from .config import Singleton, Config
-
+import traceback
+from typing import Literal
+from .config import Config
+from loguru import logger
 
 settings = Config()
 
-logging.getLogger()
 
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 
 
-class JsonFormatter(logging.Formatter):
-    def format(self, record):
-        log_record = {
-            "timestamp": datetime.now().replace(microsecond=0).isoformat(),
-            "level": record.levelname,
-            "name": record.name,
-            "message": record.getMessage(),
-        }
-        if hasattr(record, "duration"):
-            log_record["duration"] = round(record.duration, 4)
-        if hasattr(record, "method"):
-            log_record["method"] = record.method
-        # Если есть exc_info — это лог исключения
-        # if record.exc_info:
-        #     # log_record["exception"] = self.formatException(record.exc_info)
+class LoggerFactory:
+    names = ["root", "http", "api"]
 
-        #     # Извлекаем стек ошибки
-        #     tb = record.exc_info[2]
-        #     if tb:
-        #         last_trace = traceback.extract_tb(tb)[-1]
-        #         log_record["file"] = last_trace.filename
-        #         log_record["line"] = last_trace.lineno
-        #         log_record["func"] = last_trace.name
-        #     else:
-        #         log_record["file"] = "Unknown"
-        #         log_record["line"] = 0
-        #         log_record["func"] = "Unknown"
-        # else:
-        #     # Обычное логирование — просто откуда вызван лог
-        log_record["file"] = record.caller_file
-        log_record["line"] = record.caller_line
-        log_record["func"] = record.caller_func
+    @staticmethod
+    def last_stack_lines(limit=5):
+        stack = traceback.format_stack(limit=limit)
+        return "".join(stack)
 
-        return json.dumps(log_record, ensure_ascii=False)
+    @staticmethod
+    def setup():
+        logger.remove(0)  # Удалить стандартный хендлер
+        logger.level("INFO", color="<green>", icon="✅")
+        # Консольный лог
+        logger.add(
+            sys.stdout,
+            level="INFO",
+            format="<green>{time:HH:mm:ss}</green> |<level> {level.icon:^3} </level> | <level>{level:^8}</level> |   <yellow>{message}</yellow>",
+            enqueue=True,
+        )
 
+        # INFO лог — хранится 14 дней
+        logger.add(
+            LOG_DIR / "info.log",
+            level="INFO",
+            filter=lambda r: r["level"].name == "INFO"
+            and r["extra"].get("channel") == "root",
+            retention="14 days",
+            rotation="20 MB",
+            format=LoggerFactory._json_formatter,
+            enqueue=True,
+        )
 
-class ConsoleFormatter(logging.Formatter):
-    def format(self, record):
+        # DEBUG лог — хранится 2 дня
+        logger.add(
+            LOG_DIR / "debug.log",
+            level="DEBUG",
+            retention="2 days",
+            filter=lambda r: r["extra"].get("channel") in LoggerFactory.names,
+            rotation="10 MB",
+            format=LoggerFactory._json_formatter,
+            enqueue=True,
+        )
 
-        timestamp = datetime.now().replace(microsecond=0).isoformat()
-        level = record.levelname
-        name = record.name
-        message = record.getMessage()
+        # WARNING и выше
+        logger.add(
+            LOG_DIR / "error.log",
+            level="ERROR",
+            retention="10 days",
+            rotation="10 MB",
+            format=LoggerFactory._critical_formatter,
+            enqueue=True,
+        )
 
-        return f"{timestamp}| {level} | {name} | {message} |"
+        # CRITICAL ошибки + стек (5 строк)
+        logger.add(
+            LOG_DIR / "critical.log",
+            level="CRITICAL",
+            retention="14 days",
+            rotation="5 MB",
+            serialize=True,  # format=LoggerFactory._critical_formatter,
+            enqueue=True,
+        )
+        # API внешний
+        logger.add(
+            LOG_DIR / "api.log",
+            level="DEBUG",
+            filter=lambda record: record["extra"].get("channel") == "api",
+            retention="2 days",
+            rotation="10 MB",
+            format=LoggerFactory._json_formatter,
+            enqueue=True,
+        )
+        # http
+        logger.add(
+            LOG_DIR / "http.log",
+            level="DEBUG",
+            filter=lambda record: record["extra"].get("channel") == "http",
+            retention="2 days",
+            rotation="10 MB",
+            format=LoggerFactory._json_formatter,
+            enqueue=True,
+        )
 
-
-class LoggerFactory(Singleton):
-    name = "root"
-
-    @classmethod
-    def _get_logger(
-        cls, name: str | None = None, level=logging.DEBUG
-    ) -> logging.Logger:
-        logger_name = name or cls.name
-        logger = logging.getLogger(logger_name)
-        logger.propagate = False
-        logger.setLevel(level)
-        if logger.hasHandlers():
-            return logger
-
-            # --- Общий для всех: консоль ---
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(ConsoleFormatter())
-        console_handler.setLevel(logging.INFO)
-        logger.addHandler(console_handler)
-
-        # --- Для http логгера ---
-        if logger_name == "http":
-            http_handler = RotatingFileHandler(
-                LOG_DIR / "http_requests.log",
-                maxBytes=10 * 1024 * 1024,
-                backupCount=5,
-                encoding="utf-8",
-            )
-            http_handler.setFormatter(JsonFormatter())
-            http_handler.setLevel(logging.DEBUG)
-            logger.addHandler(http_handler)
-
-        # --- Для API логгера ---
-        elif logger_name == "api":
-            api_handler = RotatingFileHandler(
-                LOG_DIR / "api.log",
-                maxBytes=10 * 1024 * 1024,
-                backupCount=5,
-                encoding="utf-8",
-            )
-            api_handler.setFormatter(JsonFormatter())
-            api_handler.setLevel(logging.DEBUG)
-            logger.addHandler(api_handler)
-
-        # --- Для root логгера (основное приложение) ---
-        elif logger_name == "root":
-            app_handler = RotatingFileHandler(
-                LOG_DIR / "app.log",
-                maxBytes=10 * 1024 * 1024,
-                backupCount=5,
-                encoding="utf-8",
-            )
-            app_handler.setFormatter(JsonFormatter())
-            app_handler.setLevel(logging.INFO)
-            logger.addHandler(app_handler)
-
-            debug_handler = RotatingFileHandler(
-                LOG_DIR / "debug.log",
-                maxBytes=10 * 1024 * 1024,
-                backupCount=1,
-                encoding="utf-8",
-            )
-            debug_handler.setFormatter(JsonFormatter())
-            debug_handler.setLevel(logging.DEBUG)
-            logger.addHandler(debug_handler)
-
-            error_handler = RotatingFileHandler(
-                LOG_DIR / "error.log",
-                maxBytes=10 * 1024 * 1024,
-                backupCount=5,
-                encoding="utf-8",
-            )
-            error_handler.setFormatter(JsonFormatter())
-            error_handler.setLevel(logging.ERROR)
-            logger.addHandler(error_handler)
-
-        libs_to_silence = ["pymongo", "apscheduler"]
-
-        for name in logging.root.manager.loggerDict:
-            if any(name.startswith(lib) for lib in libs_to_silence):
-                logging.getLogger(name).setLevel(logging.CRITICAL + 1)
-                logging.getLogger(name).propagate = False
-
-        return logger
-
-    @classmethod
-    def _get_calling_context(cls):
-        # Извлекаем информацию о месте вызова
-        stack = inspect.stack()
-        caller = stack[2]  # Стек вызывает второй элемент
-        filename = Path(caller.filename).name
-        line_number = caller.lineno
-        func_name = caller.function
-
-        return {
-            "caller_file": filename,
-            "caller_line": line_number,
-            "caller_func": func_name,
+    @staticmethod
+    def _json_formatter(record):
+        """Кастомный сериализатор для логов в JSON"""
+        log_entry = {
+            "time": record["time"].isoformat(),
+            "level": record["level"].name,
+            "message": record["message"],
+            "name": record["name"],
+            "function": record["function"],
+            "line": record["line"],
+            "extra": record.get("extra", {}),
         }
 
-    @classmethod
-    def debug(cls, message: str, name: str | None = None, extra: dict | None = None):
-        logger = cls._get_logger(name, logging.DEBUG)
-        context = cls._get_calling_context()
-        logger.debug(message, extra={**context, **(extra or {})})
+        string = json.dumps(log_entry, ensure_ascii=False) + "\n"
+        string = string.replace("{", "{{").replace("}", "}}")
 
-    @classmethod
-    def info(cls, message: str, name: str | None = None, extra: dict | None = None):
-        logger = cls._get_logger(name, logging.INFO)
-        context = cls._get_calling_context()
-        logger.info(message, extra={**context, **(extra or {})})
+        return string
 
-    @classmethod
-    def warn(cls, message: str, name: str | None = None, extra: dict | None = None):
-        logger = cls._get_logger(name, logging.WARNING)
-        context = cls._get_calling_context()
-        logger.warning(message, extra={**context, **(extra or {})})
+    @staticmethod
+    def _critical_formatter(record):
 
-    @classmethod
-    def error(
-        cls,
+        string = (
+            json.dumps(
+                {
+                    "time": record["time"].isoformat(),
+                    "level": record["level"].name,
+                    "message": record["message"],
+                    "name": record["name"],
+                    "function": record["function"],
+                    "line": record["line"],
+                    "short_trace": LoggerFactory.last_stack_lines(limit=5),
+                    "extra": record.get("extra", {}),
+                },
+                ensure_ascii=False,
+            )
+            + "\n"
+        )
+
+        string = string.replace("{", "{{").replace("}", "}}")
+        return string
+
+    @staticmethod
+    def log(
         message: str,
-        name: str | None = None,
-        exc_info: bool = True,
-        extra: dict | None = None,
+        channel: Literal["root", "http", "api"] = "root",
+        level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO",
+        **extra,
     ):
-        logger = cls._get_logger(name, logging.ERROR)
-        context = cls._get_calling_context()
-        logger.error(message, exc_info=exc_info, extra={**context, **(extra or {})})
+        logger.bind(channel=channel, **extra).log(level, message)
 
-    @classmethod
-    def critical(
-        cls,
-        message: str,
-        name: str | None = None,
-        exc_info: bool = True,
-        extra: dict | None = None,
-    ):
-        logger = cls._get_logger(name, logging.CRITICAL)
-        context = cls._get_calling_context()
-        logger.critical(message, exc_info=exc_info, extra={**context, **(extra or {})})
+    @staticmethod
+    def test_exp(str):
+        logger.exception(str)
+
+    @staticmethod
+    def head_log(limit=100):
+        with open(LOG_DIR / "debug.log", "r", encoding="utf-8") as f:
+            lines = f.readlines()[-limit:]
+            lines = [line.strip() for line in lines]
+            lines = [json.loads(line) for line in lines]
+        return lines
+
+
+log = LoggerFactory.setup()
