@@ -1,4 +1,6 @@
 .vscode
+docker
+*.md
 .pytest_cache
 __pycache__
 .VSCodeCounter
@@ -16,3 +18,5 @@ logs
 .test.env
 .env
 latest.Session.json
+run.py
+data.json

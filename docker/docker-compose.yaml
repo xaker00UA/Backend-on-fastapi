@@ -1,0 +1,59 @@
+
+
+services:
+  
+  cash:
+    image : redis:latest
+    container_name: cash
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--maxmemory", "500mb", "--maxmemory-policy", "allkeys-lru"]
+
+
+  db: 
+    image: mongo:latest 
+    container_name: mongo
+    ports: 
+    - "27000:27017"
+  backend: 
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: backend
+    depends_on: 
+    - db 
+    - cash
+    env_file:
+      - ../env
+    volumes:
+     - "./logs:/app/logs"
+
+    frontend:
+  image: node:20
+  container_name: frontend
+  working_dir: /app
+  volumes:
+    - ../frontend:/app  # build будет тут
+  command: >
+    sh -c "
+      git clone --depth 1 --branch dev https://github.com/xaker00UA/Frontend-wotblitz.git . &&
+      npm install &&
+      npm run build
+    "
+ 
+  nginx:
+    container_name: nginx
+    image: nginx:latest
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ../frontend/dist:/static/frontend
+    ports:
+      - "80:80"
+    depends_on: 
+    - backend 
+    - db
+
+volumes:
+  mongo_data:
+  frontend:
