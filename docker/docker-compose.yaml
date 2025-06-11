@@ -30,7 +30,7 @@ services:
      - "./logs:/app/logs"
 
   frontend:
-    image: node:20
+    image: node:latest
     container_name: frontend
     working_dir: /app
     volumes:
