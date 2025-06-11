@@ -37,6 +37,7 @@ services:
       - ../frontend:/app  # build будет тут
     command: >
       sh -c "
+        apt-get update && apt-get install -y git &&
         git clone --depth 1 --branch dev https://github.com/xaker00UA/Frontend-wotblitz.git . &&
         npm install &&
         npm run build
