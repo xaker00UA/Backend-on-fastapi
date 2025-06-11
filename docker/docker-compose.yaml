@@ -29,18 +29,18 @@ services:
     volumes:
      - "./logs:/app/logs"
 
-    frontend:
-  image: node:20
-  container_name: frontend
-  working_dir: /app
-  volumes:
-    - ../frontend:/app  # build будет тут
-  command: >
-    sh -c "
-      git clone --depth 1 --branch dev https://github.com/xaker00UA/Frontend-wotblitz.git . &&
-      npm install &&
-      npm run build
-    "
+  frontend:
+    image: node:20
+    container_name: frontend
+    working_dir: /app
+    volumes:
+      - ../frontend:/app  # build будет тут
+    command: >
+      sh -c "
+        git clone --depth 1 --branch dev https://github.com/xaker00UA/Frontend-wotblitz.git . &&
+        npm install &&
+        npm run build
+      "
  
   nginx:
     container_name: nginx
