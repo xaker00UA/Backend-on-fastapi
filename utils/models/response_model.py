@@ -10,6 +10,34 @@ class Region(str, Enum):
     na = "na"
 
 
+class Medal(BaseModel):
+    name: str
+    image: str = "undefined"
+    count: int
+
+    def __sub__(self, other):
+        if not isinstance(other, Medal):
+            return NotImplemented
+        count = self.count - other.count
+        return self.model_copy(update={"count": count}, deep=True)
+
+
+class Medals(BaseModel):
+    medals: list[Medal] = []
+
+    def __sub__(self, other):
+        if not isinstance(other, Medals):
+            return NotImplemented
+        medals = []
+        other_medals = {element.name: element for element in other.medals}
+        for medal in self.medals:
+            if medal.name in other_medals:
+                medals.append(medal - other_medals[medal.name])
+            else:
+                medals.append(medal)
+        return self.model_copy(update={"medals": medals}, deep=True)
+
+
 class BaseStats(BaseModel):
     battles: int = Field(default=0)
     winrate: float = Field(default=0)
@@ -157,6 +185,7 @@ class RestUser(RestUserDB):
     private: RestPrivate | None = None
     general: General
     tanks: GeneralTanks | None = None
+    medals: Medals = Medals()
 
     def __sub__(self, other):
         if isinstance(other, RestUser):

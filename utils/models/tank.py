@@ -2,7 +2,7 @@ from pydantic import BaseModel, computed_field
 from typing import Optional
 from utils.models.base_models import Session
 from utils.models.configmodel import StrMixin
-from utils.models.respnse_model import (
+from utils.models.response_model import (
     General,
     ItemTank,
     Region,
@@ -189,7 +189,11 @@ class Rating(BaseModel, Session):
                 return None
             result = {}
             for field, value in vars(self).items():
-                if not isinstance(value, bool) and isinstance(value, (int, float)):
+                if (
+                    not isinstance(value, bool)
+                    and isinstance(value, (int, float))
+                    and not isinstance(getattr(other, field), type(None))
+                ):
                     result[field] = abs(getattr(self, field) - getattr(other, field))
             if result["battles"] == 0:
                 return None

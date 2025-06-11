@@ -11,7 +11,7 @@ from fastapi import (
 )
 from fastapi.responses import RedirectResponse, JSONResponse
 
-from utils.models.respnse_model import AuthLogin, AuthVerify, Region, RestUserDB
+from utils.models.response_model import AuthLogin, AuthVerify, Region, RestUserDB
 from ...interfase.player import PlayerSession
 from utils.settings.logger import LoggerFactory
 
@@ -33,9 +33,7 @@ async def require_authentication(request: Request):
             headers={"Location": "/login/eu"},  # Необязательно, но полезно
         )
     # Если требуется дополнительная проверка токена, добавьте её здесь
-    return (
-        token  # Возвращает токен или другую информацию, если пользователь авторизован
-    )
+    return token
 
 
 router = APIRouter(tags=["auth"])
@@ -69,8 +67,8 @@ async def auth(
     )
     background_tasks.add_task(player.add_player)
 
-    LoggerFactory.info(message=f"region:{region}")
-    LoggerFactory.info(message=f"player:{player.user.model_dump()}")
+    LoggerFactory.log(message=f"region:{region}")
+    LoggerFactory.log(message=f"player:{player.user.model_dump()}")
     response = JSONResponse(content=RestUserDB(**player.user.model_dump()).model_dump())
     response.delete_cookie("region")
     response.set_cookie("access_token", access_token, httponly=True, path="/")

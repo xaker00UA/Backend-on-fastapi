@@ -2,9 +2,9 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from decimal import Decimal
 
-from utils.models.respnse_model import General, Region, RestUser
+from utils.models.response_model import General, Medals, Region, RestUser
 from utils.models.base_models import Session
-from utils.models.tank import Tank, StatsTank, PlayerModel, Rating
+from utils.models.tank import Tank, StatsTank, PlayerModel
 
 
 class PlayerDetails(PlayerModel, Session):
@@ -47,6 +47,8 @@ class UserDB(BaseModel, Session):
     player_id: int | None = None
     access_token: str | None = None
     acount: PlayerDetails | PlayerModel = None
+    medal: Medals = Medals()
+
     timestamp: int = Field(default_factory=lambda: int(datetime.now().timestamp()))
 
     def __sub__(self, other):
@@ -56,6 +58,7 @@ class UserDB(BaseModel, Session):
             update={
                 "acount": self.acount - other.acount,
                 "timestamp": self.timestamp - other.timestamp,
+                "medal": self.medal - other.medal,
             },
             deep=True,
         )
@@ -64,6 +67,7 @@ class UserDB(BaseModel, Session):
         model = self.acount.result(type=type)
         model.region = Region(self.region)
         model.time = self.timestamp
+        model.medals = self.medal
         return model
 
 

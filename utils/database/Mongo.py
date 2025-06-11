@@ -1,20 +1,19 @@
-import os
 from typing import AsyncGenerator
-from motor.motor_asyncio import (
-    AsyncIOMotorClient,
-    AsyncIOMotorCollection,
-    AsyncIOMotorCursor,
-)
+from pymongo import AsyncMongoClient
+from pymongo.asynchronous.database import AsyncDatabase
+from pymongo.asynchronous.collection import AsyncCollection
+from pymongo.asynchronous.cursor import AsyncCursor
 
 from .helper import get_clan_rating_pipeline
 from utils.settings.logger import LoggerFactory
 from ..models.player import UserDB, Tank
 from ..models.clan import ClanDB
+from utils.settings.config import EnvConfig
 
 
 class Connect:
-    client = AsyncIOMotorClient(os.getenv("MONGO", "mongodb://localhost:27017/"))
-    db = client[os.getenv("NAME_DB", "wotblitz")]
+    client = AsyncMongoClient(EnvConfig.MONGO)
+    db: AsyncDatabase = client[EnvConfig.NAME_DB]
 
     @classmethod
     async def add(cls, data):
@@ -22,7 +21,7 @@ class Connect:
 
 
 class Player_sessions(Connect):
-    collection: AsyncIOMotorCollection = Connect.db["Session"]
+    collection: AsyncCollection = Connect.db["Session"]
 
     @classmethod
     async def get(cls, name, id, region, access_token) -> UserDB:
@@ -76,8 +75,8 @@ class Player_sessions(Connect):
 
     @classmethod
     async def find_all(cls) -> AsyncGenerator[list[UserDB], None]:
-        cursor: AsyncIOMotorCursor = cls.collection.find()
         batch_size = 100
+        cursor: AsyncCursor = cls.collection.find(batch_size=batch_size)
 
         while True:
             batch = await cursor.to_list(length=batch_size)
@@ -87,7 +86,7 @@ class Player_sessions(Connect):
 
 
 class Clan_sessions(Connect):
-    collection: AsyncIOMotorCollection = Connect.db["Clan"]
+    collection: AsyncCollection = Connect.db["Clan"]
 
     @classmethod
     async def get(cls, name: str, clan_id, region) -> ClanDB:
@@ -137,8 +136,8 @@ class Clan_sessions(Connect):
 
     @classmethod
     async def find_all(cls) -> AsyncGenerator[list, None]:
-        cursor: AsyncIOMotorCursor = cls.collection.find()
         batch_size = 100
+        cursor: AsyncCursor = cls.collection.find(batch_size=batch_size)
 
         while True:
             batch = await cursor.to_list(length=batch_size)
@@ -148,7 +147,7 @@ class Clan_sessions(Connect):
 
 
 class Player_all_sessions(Player_sessions):
-    collection: AsyncIOMotorCollection = Connect.db["Session_all"]
+    collection: AsyncCollection = Connect.db["Session_all"]
 
     @classmethod
     async def add(cls, user: list[UserDB]) -> UserDB:
@@ -242,12 +241,13 @@ class Player_all_sessions(Player_sessions):
 
         pipeline += [{"$limit": limit}]
 
-        res = cls.collection.aggregate(pipeline)
-        return await res.to_list()
+        res = await cls.collection.aggregate(pipeline)
+        res = await res.to_list(length=limit)
+        return res
 
 
 class Clan_all_sessions(Clan_sessions):
-    collection: AsyncIOMotorCollection = Connect.db["Clan_all"]
+    collection: AsyncCollection = Connect.db["Clan_all"]
 
     @classmethod
     async def add(cls, clan: ClanDB) -> ClanDB:
@@ -257,11 +257,12 @@ class Clan_all_sessions(Clan_sessions):
     @classmethod
     async def get_top(cls, end_day, start_day, limit=10):
         pipeline = get_clan_rating_pipeline(start_day, end_day)
-        return await cls.collection.aggregate(pipeline).to_list(length=limit)
+        cursor = await cls.collection.aggregate(pipeline)
+        return await cursor.to_list(length=limit)
 
 
 class Tank_DB(Connect):
-    collection: AsyncIOMotorCollection = Connect.db["Tank"]
+    collection: AsyncCollection = Connect.db["Tank"]
 
     @classmethod
     async def get_by_id(cls, id: int | Tank) -> dict:
@@ -273,7 +274,7 @@ class Tank_DB(Connect):
             res["level"] = res.pop("tier")
         else:
             res = {"level": "undefined", "name": "undefined"}
-            LoggerFactory.warn(f"Танк не найден с параметрами id={id}")
+            LoggerFactory.log(f"Танк не найден с параметрами id={id}", level="DEBUG")
         return res
 
     @classmethod
@@ -288,10 +289,36 @@ class Tank_DB(Connect):
         for tank_id in id:
             if tank_id not in data:
                 data[tank_id] = {"level": "undefined", "name": "undefined"}
-                LoggerFactory.warn(f"Танк не найден с параметрами id={tank_id}")
-
+                LoggerFactory.log(
+                    f"Танк не найден с параметрами id={tank_id}", level="DEBUG"
+                )
         return data
 
     @classmethod
     async def add(cls, tank: dict | list[dict]) -> Tank:
-        cls.collection.replace_one(filter={"tank_id": tank["tank_id"]})
+        await cls.collection.replace_one(filter={"tank_id": tank["tank_id"]})
+
+
+class Medal_DB(Connect):
+    collection: AsyncCollection = Connect.db["Medal"]
+
+    @classmethod
+    async def get(cls, name: str):
+        res = await cls.collection.find_one(
+            filter={"name": name}, projection={"_id": 0}
+        )
+        if res:
+            return res
+        else:
+            LoggerFactory.log(
+                f"Медаль не найдена с параметрами name={name}", level="DEBUG"
+            )
+            return {"name": "undefined", "image": "undefined"}
+
+    @classmethod
+    async def get_list(cls, names: list[str]):
+        res = await cls.collection.find({"name": {"$in": names}}).to_list(
+            length=len(names)
+        )
+        res = {item["name"]: item["image"] for item in res}
+        return res

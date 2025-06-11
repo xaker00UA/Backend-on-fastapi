@@ -32,3 +32,6 @@ class EnvConfig:
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "360"))
     SUPERUSER = os.getenv("SUPER_USER", "root")
     PASSWORD = os.getenv("PASSWORD", "root")
+    MONGO = os.getenv("MONGO", "mongodb://localhost:27017/")
+    NAME_DB = os.getenv("NAME_DB", "wotblitz")
+    REDIS = os.getenv("REDIS", "redis://localhost:6379")

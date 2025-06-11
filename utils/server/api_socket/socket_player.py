@@ -1,7 +1,7 @@
 import asyncio
 from fastapi import APIRouter, WebSocket
 
-from utils.models.respnse_model import Region
+from utils.models.response_model import Region
 from ...interfase.player import PlayerSession
 
 

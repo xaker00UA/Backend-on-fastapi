@@ -1,8 +1,8 @@
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from utils.models.tank import PlayerModel
-from utils.models.respnse_model import BaseStats, RestClan, RestMember
+from utils.models.response_model import BaseStats, RestClan, RestMember
 from utils.models.base_models import Session
 
 
@@ -116,6 +116,8 @@ class ClanTop(BaseModel):
     def round_rating(cls, v):
         return round(v, 4)
 
-    @field_validator("general_wins", mode="before")
-    def valid_wins(cls, v):
-        return 100 * v
+    @field_serializer("general_wins")
+    def valid_wins(self, v):
+        if v < 0:
+            return 100 * v
+        return v

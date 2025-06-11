@@ -1,9 +1,5 @@
 import asyncio
 from datetime import datetime, timedelta
-from functools import wraps
-import hashlib
-from time import time
-from collections import OrderedDict
 
 from fastapi import (
     APIRouter,
@@ -11,14 +7,18 @@ from fastapi import (
     BackgroundTasks,
     Depends,
 )
-from fastapi.responses import JSONResponse
+
+from utils.service.calculate_time import round_timestamp
+
 
 from ..api_socket import player_router_socket
 from ..auth import require_authentication
 
 from ...interfase.player import PlayerSession
-from ...models.respnse_model import Parameter, Region, RestUser, RestUserDB, TopPlayer
+from ...models.response_model import Parameter, Region, RestUser, RestUserDB, TopPlayer
 from ...error import NotFoundPlayerDB
+
+from utils.cache.redis_cache import redis_cache
 
 
 router = APIRouter(tags=["player"])
@@ -49,9 +49,7 @@ async def search(name: str) -> list[RestUserDB]:
     raise NotFoundPlayerDB(name=name)
 
 
-@router.get(
-    "/top_players",
-)
+@router.get("/top_players")
 async def top_players(
     limit: int = 10,
     parameter: Parameter = Parameter.battles,
@@ -59,8 +57,24 @@ async def top_players(
         datetime.now().timestamp() - timedelta(days=7).total_seconds()
     ),
 ) -> list[TopPlayer]:
-    return await PlayerSession.top_players(
-        limit=limit, parameter=parameter, start_day=start_day
+    # округляем до ближайшего 12-часового интервала
+    rounded_start_day = round_timestamp(start_day)
+
+    cache_key_params = {
+        "limit": limit,
+        "parameter": parameter.value,
+        "start_day": rounded_start_day,
+    }
+
+    return await redis_cache.cache_or_compute(
+        namespace="top_players",
+        expire=6 * 3600,
+        compute_func=lambda: PlayerSession.top_players(
+            limit=limit,
+            parameter=parameter,
+            start_day=start_day,  # используем исходный timestamp
+        ),
+        **cache_key_params,
     )
 
 
@@ -78,16 +92,18 @@ async def get_general(
 
 
 @stats.get("/get_session", response_model=RestUser)
-async def get_session(
-    region: Region, name: str, background_tasks: BackgroundTasks
-) -> RestUser:
+async def get_session(region: Region, name: str) -> RestUser:
     try:
-        return await PlayerSession(name=name, reg=region.value).results()
+        return await redis_cache.cache_or_compute(
+            "get_session",
+            60,
+            PlayerSession(name=name, reg=region.value).results,
+            name=name,
+            region=region.value,
+        )
+
     except NotFoundPlayerDB:
-        # await PlayerSession(name=name, reg=region.value).add_player()
-        # background_tasks.add_task()
         asyncio.create_task(PlayerSession(name=name, reg=region.value).add_player())
-        # return
         raise NotFoundPlayerDB(region=region.value, name=name)
 
 

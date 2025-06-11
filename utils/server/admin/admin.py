@@ -5,9 +5,12 @@ from fastapi import (
     Response,
     status,
 )
+from fastapi.requests import Request
 
-from utils.models.respnse_model import Command, LoginForm
-
+from utils.interfase.admin import MetricsInterface
+from utils.models.response_model import Command, LoginForm
+from prometheus_client import generate_latest
+from utils.server.admin.schemas import AdminStats
 from utils.settings.logger import LoggerFactory
 from ...database.admin import get_user, verify_password, create_access_token, valid
 
@@ -51,3 +54,9 @@ async def protected_route(commands: Command, current_user=Depends(valid)):
 @router.get("/verify")
 async def verify_token(admin=Depends(valid)):
     return admin
+
+
+@router.get("/info", response_model=AdminStats)
+async def info(requests: Request, limit: int = 100, current_user=Depends(valid)):
+    service = MetricsInterface(requests.app.state.time)
+    return await service.collect_all(limit=limit)
