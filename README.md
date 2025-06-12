@@ -1,28 +1,27 @@
 # Данный проект поможет отслеживать сессии игроков мирового шутера World of Tanks Blitz
 
-### Для запуска проекта на пк необходимо:
+### Для запуска проекта локально необходимо:
 - создать приложение [тут](https://developers.wargaming.net/)
 - установить poetry если не установлен 
 - установить redis
 - установить MongoDB
-- создать .env файл такого типа
-``` .env
-MONGO=mongodb://localhost:27017/
-NAME_DB=latest
-WG_APP_IDS=application_id
-LIMIT=10 # В зависимости от приложения 10 or 20
-SECRET_KEY=SECRET_KEY
-ALGORITHM=H256
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
-SUPER_USER=root
-PASSWORD=root
-REDIS=redis://redis:6379
-```
+- создать .env файл такого [типа](./docker/.env.example)
+
 - запустить сервер командой
 ``` sh
 poetry install --only main --no-root
+python -m scripts.init_db
 uvicorn utils.server.app:app --host 0.0.0.0 --port 8000 --no-access-log
 ```
+### Для запуска проекта в docker необходимо:
+- создать приложение [тут](https://developers.wargaming.net/)
+- создать .env файл такого [типа](./docker/.env.example)
+
+- запустить сервер командой
+``` sh
+docker-compose up -d -f ./docker/docker-compose.yml
+```
+
 ### Функциональность 
 1. Сбрасывать сессию может только авторизованый игрок который прошел OAuth 2.0 через ручку /login
 2. Отображение главных показателей на текущий момент
@@ -38,3 +37,16 @@ uvicorn utils.server.app:app --host 0.0.0.0 --port 8000 --no-access-log
 - сбросить сесиию у определенного игрока или клана
 - обновить бд игроков или кланов до или после события по росписанию
 - также для админа вывод информационных данных о состояние сервера
+- сбор метркик приложения
+
+### Frontend
+Фронтед можно посмотреть [здесь](https://github.com/xaker00UA/Frontend-wotblitz)
+### Внешний вид
+![](./public/1.png)
+![](./public/2.png)
+![](./public/3.png)
+![](./public/5.png)
+![](./public/6.png)
+![](./public/7.png)
+![](./public/8.png)
+![](./public/9.png)

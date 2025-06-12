@@ -82,8 +82,8 @@ app = FastAPI(
     lifespan=lifespan,
     servers=[
         {"url": "http://localhost:8000", "description": "Local server API"},
-        {"url": "http://testserver.ua/api:80", "description": "Latest server API"},
-        {"url": "http://wotblstatic.com/api:80", "description": "Prod server API"},
+        {"url": "http://testserver.ua/api", "description": "Latest server API"},
+        {"url": "http://wotblstatic.com/api", "description": "Prod server API"},
     ],
     middleware=mid,
     responses={
