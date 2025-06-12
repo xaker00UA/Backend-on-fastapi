@@ -295,8 +295,10 @@ class Tank_DB(Connect):
         return data
 
     @classmethod
-    async def add(cls, tank: dict | list[dict]) -> Tank:
-        await cls.collection.replace_one(filter={"tank_id": tank["tank_id"]})
+    async def add(cls, tank: dict):
+        await cls.collection.replace_one(
+            filter={"tank_id": tank["tank_id"]}, replacement=tank, upsert=True
+        )
 
 
 class Medal_DB(Connect):
@@ -322,3 +324,9 @@ class Medal_DB(Connect):
         )
         res = {item["name"]: item["image"] for item in res}
         return res
+
+    @classmethod
+    async def add(cls, medal: dict):
+        await cls.collection.replace_one(
+            filter={"name": medal["name"]}, replacement=medal, upsert=True
+        )

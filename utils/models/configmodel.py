@@ -53,6 +53,8 @@ class Urls(BaseModel, StrMixin):
     logout: str
     search_clan: str
     get_clan_info: str
+    get_tankopedia_tank: str
+    get_tankopedia_achievements: str
 
 
 class GameApi(BaseModel, StrMixin):

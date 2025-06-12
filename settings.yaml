@@ -93,3 +93,10 @@ game_api:
     get_clan_info: "https://api.wotblitz.<reg_url>/wotb/clans/info/\
       ?application_id=<app_id>\
       &clan_id=<clan_id>"
+
+    get_tankopedia_tank: "https://api.wotblitz.eu/wotb/encyclopedia/vehicles/\
+      ?application_id=<app_id>"
+
+    get_tankopedia_achievements:
+      "https://api.wotblitz.eu/wotb/encyclopedia/achievements/\
+      ?application_id=<app_id>"
