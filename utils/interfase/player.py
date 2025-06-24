@@ -161,7 +161,8 @@ class PlayerSession:
 
     async def reset(self, isAdmin=False):
         await self.get_player_DB()
-        self.user = await self.session.get_details_tank(self.old_user)
+        self.user = self.old_user
+        await self.get_player_details()
         await Player_sessions.add(self.user)
         if not isAdmin:
             data = {

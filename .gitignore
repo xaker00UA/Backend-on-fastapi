@@ -17,3 +17,5 @@ data.json
 *.log
 *db
 .env
+.coverage
+scripts/help.py
