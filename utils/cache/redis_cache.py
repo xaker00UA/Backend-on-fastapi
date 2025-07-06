@@ -25,9 +25,9 @@ class RedisCache:
             return json.loads(data)
         return None
 
-    async def set(self, key: str, value: Any, expire: int = 3600):
+    async def set(self, key: str, value: str, expire: int = 3600):
         await self.connect()
-        await self.redis.set(key, json.dumps(value), ex=expire)
+        await self.redis.set(key, value, ex=expire)
 
     def make_key(self, namespace: str, **params) -> str:
         raw = json.dumps(params, sort_keys=True)
@@ -44,8 +44,9 @@ class RedisCache:
         model = await compute_func()
         if isinstance(model, list):
             result = [i.model_dump() for i in model]
+            result = json.dumps(result)
         if isinstance(model, BaseModel):
-            result = model.model_dump()
+            result = model.model_dump_json()
         await self.set(key, result, expire)
         return model
 

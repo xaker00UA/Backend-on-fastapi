@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Callable
-from pydantic import BaseModel, PrivateAttr, model_validator, Field
+from pydantic import BaseModel, PrivateAttr, model_validator, Field, ConfigDict
 
 
 class Region(str, Enum):
@@ -59,6 +59,8 @@ class BaseStats(BaseModel):
                 }
             )
 
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
 
 class RestStatsTank(BaseStats):
     profit_coefficient: float = Field(default=0)
@@ -106,6 +108,8 @@ class ItemTank(BaseModel):
                     "all": self.all - other.all,
                 }
             )
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
 
 class General(BaseModel):
@@ -160,6 +164,7 @@ class RestPrivate(BaseModel):
     is_premium: bool = False
     premium_expires_at: int = 0
     battle_life_time: int = 0
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     def __sub__(self, other):
         if isinstance(other, RestPrivate):
@@ -202,6 +207,8 @@ class RestUser(RestUserDB):
                 }
             )
 
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
 
 class RestMember(BaseModel):
     id: int
@@ -219,6 +226,8 @@ class RestClan(BaseModel):
     members: list[RestMember]
     general: BaseStats = BaseStats()
     time: int | str | None
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
 
 class ErrorResponse(BaseModel):

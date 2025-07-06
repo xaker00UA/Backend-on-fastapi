@@ -1,12 +1,13 @@
+import json
 from aiohttp import ClientSession, ClientResponse
 from asynciolimiter import Limiter
 from prometheus_client import Counter
 import asyncio
 import time
+from utils.cache.redis_cache import RedisCache
 from utils.models.base_models import Singleton
 from utils.models.player import UserDB, PlayerDetails
 from utils.models.clan import Clan, ClanDetails
-from utils.api.cache import Cache
 from utils.error.exception import *
 from utils.models.tank import PlayerModel
 from utils.settings.config import Config, EnvConfig
@@ -42,9 +43,8 @@ class APIServer(Singleton):
             self.limiter = Limiter(EnvConfig.LIMIT)
             self.session = None
             self._session = self.session
-            self._players_stats = []
             self.exact = True
-            self.cache = Cache()
+            self.redis_cache = RedisCache()
             self.player_stats = {}
             self.player = {}
             self.initialized = True
@@ -154,10 +154,16 @@ class APIServer(Singleton):
         reg = user.region
         if not player_id:
             name = user.name
-            player = self.cache.get(name)
+            player = await self.redis_cache.get(name)
             if not player:
                 player_id = await self.get_id(reg, name)
             else:
+                # player = json.loads(player)
+                player = UserDB(
+                    player_id=player.get("player_id"),
+                    region=player.get("region"),
+                    name=player.get("name"),
+                )
                 player_id = player.player_id
         return player_id, reg
 
@@ -178,8 +184,7 @@ class APIServer(Singleton):
         data = await self.fetch(url)
         player_id = int(data["data"][0]["account_id"])
         user = UserDB(region=region, name=nickname, player_id=player_id)
-
-        self.cache.set(nickname, user)
+        await self.redis_cache.set(nickname, user.model_dump_json())
         return player_id
 
     async def get_general(self, user: UserDB) -> UserDB:

@@ -1,5 +1,7 @@
+import re
 from fastapi import (
     APIRouter,
+    Cookie,
     Depends,
     HTTPException,
     Response,
@@ -17,6 +19,10 @@ from ...database.admin import get_user, verify_password, create_access_token, va
 
 # FastAPI приложение
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def is_admin_valid(admin_token: str = Cookie("admin_token")):
+    return valid(admin_token)
 
 
 # Эндпоинты
@@ -45,18 +51,20 @@ def logout(response: Response):
 
 
 @router.post("/commands")
-async def protected_route(commands: Command, current_user=Depends(valid)):
+async def protected_route(commands: Command, current_user=Depends(is_admin_valid)):
 
     await commands.run()
     return {"command": "success"}
 
 
 @router.get("/verify")
-async def verify_token(admin=Depends(valid)):
+async def verify_token(admin=Depends(is_admin_valid)):
     return admin
 
 
 @router.get("/info", response_model=AdminStats)
-async def info(requests: Request, limit: int = 100, current_user=Depends(valid)):
+async def info(
+    requests: Request, limit: int = 100, current_user=Depends(is_admin_valid)
+):
     service = MetricsInterface(requests.app.state.time)
     return await service.collect_all(limit=limit)

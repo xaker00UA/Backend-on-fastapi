@@ -108,7 +108,7 @@ def create_exception_handler(status_code: int, initial_detail: str) -> Callable:
         logger.exception(f"Ошибка {type(exc).__name__}: {exc}")
 
         # Логирование ошибки
-        if isinstance(exc, NoUpdateClan) or (exc, NoUpdatePlayer):
+        if isinstance(exc, NoUpdateClan) or isinstance(exc, NoUpdatePlayer):
             LoggerFactory.log(exc, level="CRITICAL")
 
         elif isinstance(exc, BaseCustomException):

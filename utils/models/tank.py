@@ -1,4 +1,4 @@
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field
 from typing import Optional
 from utils.models.base_models import Session
 from utils.models.configmodel import StrMixin
@@ -182,6 +182,8 @@ class Rating(BaseModel, Session):
     dropped_capture_points: int = 0
     score: int | None = None
     number: int | None = None
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     def __sub__(self, other):
         if super().__sub__(other):

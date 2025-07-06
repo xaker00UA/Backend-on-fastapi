@@ -1,56 +1,56 @@
+from datetime import timedelta
+from urllib import response
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
     Query,
-    Request,
     Cookie,
     Response,
     BackgroundTasks,
-    status,
 )
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import JSONResponse
+from httpx import get
 
 from utils.models.response_model import AuthLogin, AuthVerify, Region, RestUserDB
-from ...interfase.player import PlayerSession
+from utils.interfase.player import PlayerSession
 from utils.settings.logger import LoggerFactory
+from utils.database.admin import create_access_token, valid
 
 
-def get_region(req: Request, region: str | None = Cookie(default=None)) -> str | None:
-    req
+def get_region(region: str | None = Cookie(default=None)) -> str | None:
     return region
 
 
-async def require_authentication(request: Request):
-    token = request.cookies.get("access_token", None)
+def get_token(token: str | None = Cookie(default=None)) -> str | None:
     if not token:
-        # Если пользователь не авторизован
-        response = RedirectResponse(url="/login/eu")
-        response.set_cookie("next_url", request.url.path)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not authenticated",
-            headers={"Location": "/login/eu"},  # Необязательно, но полезно
-        )
-    # Если требуется дополнительная проверка токена, добавьте её здесь
-    return token
+        return None
+    payload = valid(token)
+    return payload.get("access_token")
+
+
+def require_authentication(token: str | None = Cookie(default=None)):
+    payload = valid(token)
+    return payload.get("player_id")
 
 
 router = APIRouter(tags=["auth"])
 
 
 @router.get("/login/{region}", response_model=AuthLogin)
-async def login(region: Region, redirect_url: str, response: Response):
-    response.set_cookie("region", region.value, path="/", httponly=True)
+async def login(region: Region, redirect_url: str):
     url = await PlayerSession.get_token(region=region, redirect_url=redirect_url)
-    return AuthLogin(url=url)
+    response = JSONResponse(content=AuthLogin(url=url).model_dump())
+    response.set_cookie("region", region.value, path="/", httponly=True)
+
+    return response
 
 
 @router.get("/logout")
-async def logout(token=Depends(require_authentication)) -> bool:
-    await PlayerSession(access_token=token).logout()
+async def logout(player_id: int = Depends(require_authentication)) -> bool:
+    await PlayerSession(id=player_id).logout()
     response = JSONResponse(content=True)
-    response.delete_cookie("access_token")
+    response.delete_cookie("token")
     return response
 
 
@@ -61,24 +61,29 @@ async def auth(
     nickname: str = Query(),
     account_id: int = Query(),
     region: str | None = Depends(get_region),
-) -> RestUserDB:
+):
     player = PlayerSession(
         name=nickname, id=account_id, reg=region, access_token=access_token
     )
     background_tasks.add_task(player.add_player)
-
-    LoggerFactory.log(message=f"region:{region}")
-    LoggerFactory.log(message=f"player:{player.user.model_dump()}")
-    response = JSONResponse(content=RestUserDB(**player.user.model_dump()).model_dump())
-    response.delete_cookie("region")
-    response.set_cookie("access_token", access_token, httponly=True, path="/")
-    return response
-
-
-@router.get("/auth/verify")
-async def auth_verify_token(access_token: str = Cookie(None)) -> AuthVerify:
-    return (
-        AuthVerify(isAuthenticated=True)
-        if access_token
-        else AuthVerify(isAuthenticated=False)
+    token = create_access_token(
+        {
+            "name": nickname,
+            "player_id": account_id,
+            "region": region,
+            "access_token": access_token,
+        },
+        expires_delta=timedelta(days=7),
     )
+    LoggerFactory.log(message=f"player:{player.user.model_dump()}")
+    res = JSONResponse(content={"message": "ok"})
+    res.delete_cookie("region")
+    res.set_cookie(
+        "token",
+        token,
+        httponly=True,
+        path="/",
+        expires=7 * 24 * 60 * 60,
+    )
+
+    return res

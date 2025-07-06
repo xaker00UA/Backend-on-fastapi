@@ -1,6 +1,4 @@
 from datetime import datetime, timedelta
-import time
-from unittest import result
 from sqlalchemy import (
     create_engine,
     Column,
@@ -13,7 +11,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base
 from passlib.context import CryptContext
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 
 from utils.settings.logger import LoggerFactory
 from ..settings.config import EnvConfig
@@ -126,12 +124,10 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def valid(admin_token: str = Cookie("admin_token")):
+def valid(data):
     try:
-        payload = jwt.decode(admin_token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(data, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
-    except Exception:
-        raise InvalidAdminToken
     except ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -8,6 +8,7 @@ from fastapi import (
     Depends,
 )
 
+from utils.server.auth.auth import get_token
 from utils.service.calculate_time import round_timestamp
 
 
@@ -25,8 +26,8 @@ router = APIRouter(tags=["player"])
 
 
 @router.get("/player")
-async def player(token=Depends(require_authentication)) -> RestUserDB:
-    player = PlayerSession(access_token=token)
+async def player(player_id: int = Depends(require_authentication)) -> RestUserDB:
+    player = PlayerSession(id=player_id)
     await player.get_player_DB()
     user = RestUserDB.model_validate(player.old_user, from_attributes=True)
     return user
@@ -34,9 +35,9 @@ async def player(token=Depends(require_authentication)) -> RestUserDB:
 
 @router.get("/reset")
 async def reset(
-    background_tasks: BackgroundTasks, token=Depends(require_authentication)
+    background_tasks: BackgroundTasks, player_id: int = Depends(require_authentication)
 ) -> bool:
-    player = PlayerSession(access_token=token)
+    player = PlayerSession(id=player_id)
     background_tasks.add_task(player.reset)
     return True
 
@@ -82,22 +83,22 @@ stats = APIRouter(prefix="/{region}/player", tags=["stats"])
 
 
 @stats.get("/get_general", response_model=RestUser)
-async def get_general(
-    region: Region, name: str, access_token: str = Cookie("access_token")
-):
+async def get_general(region: Region, name: str, token: str = Depends(get_token)):
     data = await PlayerSession(
-        name=name, reg=region.value, access_token=access_token
+        name=name, reg=region.value, access_token=token
     ).get_player_info()
     return data.result("now")
 
 
 @stats.get("/get_session", response_model=RestUser)
-async def get_session(region: Region, name: str) -> RestUser:
+async def get_session(
+    region: Region, name: str, token: str = Depends(get_token)
+) -> RestUser:
     try:
         return await redis_cache.cache_or_compute(
             "get_session",
             60,
-            PlayerSession(name=name, reg=region.value).results,
+            PlayerSession(name=name, reg=region.value, access_token=token).results,
             name=name,
             region=region.value,
         )
