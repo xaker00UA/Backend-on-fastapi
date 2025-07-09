@@ -18,8 +18,8 @@ from .admin.admin import router as admin_router
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from ..interfase.player import PlayerSession
-from ..interfase.clan import ClanInterface
+from ..interface.player import PlayerSession
+from ..interface.clan import ClanInterface
 from ..database.admin import initialize_db
 from .middleware import ExceptionLoggingMiddleware
 from ..error.exception import *

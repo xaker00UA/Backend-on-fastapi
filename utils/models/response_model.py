@@ -274,8 +274,8 @@ class Command(BaseModel):
 
     @model_validator(mode="after")
     def valid(self):
-        from utils.interfase.clan import ClanInterface
-        from utils.interfase.player import PlayerSession
+        from utils.interface.clan import ClanInterface
+        from utils.interface.player import PlayerSession
 
         if self.command == Commands.reset:
             self._task = PlayerSession(name=self.arguments, reg=self.region).reset()

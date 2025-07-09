@@ -1,4 +1,5 @@
-from os import name
+from os import name, path
+import os
 import time
 from datetime import datetime, timedelta
 from prometheus_client import REGISTRY, Counter, Gauge
@@ -6,8 +7,10 @@ import re
 from utils.database.Mongo import Clan_sessions, Player_sessions
 from utils.database.admin import get_active_users
 from utils.models.base_models import Singleton
+from utils.server.admin.schemas import CreateTank
 from utils.settings.logger import LoggerFactory
 from datetime import datetime
+from utils.database.Mongo import Tank_DB
 
 
 class MetricsInterface(Singleton):
@@ -86,3 +89,27 @@ class MetricsInterface(Singleton):
             "custom_api_calls": await self.get_custom_api_call_count(),
             "last_1000_logs": await self.get_last_logs(limit),
         }
+
+
+class AdminInterface:
+    def __init__(self):
+        self.MEDIA_DIR = "media"
+        if not os.path.exists(self.MEDIA_DIR):
+            os.makedirs(self.MEDIA_DIR)
+
+    async def add_tank(self, tank_data: CreateTank, image_big, image_small):
+        path_big, path_small = None, None
+        if image_big:
+            path_big = os.path.join(self.MEDIA_DIR, f"{tank_data.tank_id}_big.png")
+            image_big.filename = f"{tank_data.tank_id}_big.png"
+            with open(path_big, "wb") as f:
+                f.write(image_big.file.read())
+        if image_small:
+            path_small = os.path.join(self.MEDIA_DIR, image_small.filename)
+            image_small.filename = f"{tank_data.tank_id}_small.png"
+            with open(path_small, "wb") as f:
+                f.write(image_small.file.read())
+        tank_data.images.preview = path_small
+        tank_data.images.normal = path_big
+        await Tank_DB.add(tank_data.model_dump())
+        return tank_data

@@ -1,7 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel
 
-from utils.models.response_model import RestUserDB
+from utils.models.response_model import Images, RestUserDB
 
 
 class AdminStats(BaseModel):
@@ -15,3 +15,12 @@ class AdminStats(BaseModel):
     external_api_calls: int
     custom_api_calls: dict[str, int]
     last_1000_logs: list[dict]
+
+
+class CreateTank(BaseModel):
+    tank_id: int
+    name: str
+    nation: str
+    tier: int
+    is_premium: bool
+    images: Images = Images()

@@ -1,4 +1,5 @@
 import re
+from tkinter import NO
 from fastapi import (
     APIRouter,
     Cookie,
@@ -9,13 +10,13 @@ from fastapi import (
 )
 from fastapi.requests import Request
 
-from utils.interfase.admin import MetricsInterface
-from utils.models.response_model import Command, LoginForm
+from utils.interface.admin import AdminInterface, MetricsInterface
+from utils.models.response_model import Command, ItemTank, LoginForm
 from prometheus_client import generate_latest
-from utils.server.admin.schemas import AdminStats
+from utils.server.admin.schemas import AdminStats, CreateTank
 from utils.settings.logger import LoggerFactory
 from ...database.admin import get_user, verify_password, create_access_token, valid
-
+from fastapi import UploadFile
 
 # FastAPI приложение
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -68,3 +69,20 @@ async def info(
 ):
     service = MetricsInterface(requests.app.state.time)
     return await service.collect_all(limit=limit)
+
+
+@router.post(
+    "/add_tank",
+    status_code=201,
+    dependencies=[Depends(is_admin_valid)],
+    response_model=CreateTank,
+)
+async def add_tank(
+    tank: CreateTank,
+    image_big: UploadFile | None = None,
+    image_small: UploadFile | None = None,
+):
+    service = AdminInterface()
+    return await service.add_tank(
+        tank_data=tank, image_big=image_big, image_small=image_small
+    )

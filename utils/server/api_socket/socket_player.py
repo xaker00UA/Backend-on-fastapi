@@ -2,7 +2,7 @@ import asyncio
 from fastapi import APIRouter, WebSocket
 
 from utils.models.response_model import Region
-from ...interfase.player import PlayerSession
+from ...interface.player import PlayerSession
 
 
 router = APIRouter(prefix="/ws")

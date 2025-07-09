@@ -114,7 +114,7 @@ class NotFoundClanDB(BaseCustomException):
         if message:
             super().__init__(message=message, **kwargs)
         else:
-            super().__init__(message="Клан не отслеживается", **kwargs)
+            super().__init__(message="Клан не отслеживается так долго", **kwargs)
 
 
 class InvalidAdminToken(BaseCustomException):

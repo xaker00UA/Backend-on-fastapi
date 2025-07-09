@@ -15,7 +15,7 @@ from utils.service.calculate_time import round_timestamp
 from ..api_socket import player_router_socket
 from ..auth import require_authentication
 
-from ...interfase.player import PlayerSession
+from ...interface.player import PlayerSession
 from ...models.response_model import Parameter, Region, RestUser, RestUserDB, TopPlayer
 from ...error import NotFoundPlayerDB
 

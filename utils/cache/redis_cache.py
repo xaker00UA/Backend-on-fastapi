@@ -5,6 +5,8 @@ import hashlib
 from typing import Any, Callable, Optional
 from utils.settings.config import EnvConfig
 
+from loguru import logger
+
 
 class RedisCache:
     def __init__(self, redis_url: str = EnvConfig.REDIS):
@@ -40,6 +42,7 @@ class RedisCache:
         key = self.make_key(namespace, **params)
         cached = await self.get(key)
         if cached:
+            logger.info("Взято из кеша функция {compute_func.__name__}")
             return cached
         model = await compute_func()
         if isinstance(model, list):

@@ -250,6 +250,18 @@ class Clan_all_sessions(Clan_sessions):
     collection: AsyncCollection = Connect.db["Clan_all"]
 
     @classmethod
+    async def get(cls, clan: ClanDB, timestamp_ago: int) -> ClanDB:
+        filter = {
+            "$and": [
+                {"clan_id": clan.clan_id},
+                {"timestamp": {"$lte": timestamp_ago}},
+            ]
+        }
+        res = await cls.collection.find_one(filter=filter, sort=[("timestamp", -1)])
+        if res:
+            return ClanDB.model_validate(res)
+
+    @classmethod
     async def add(cls, clan: ClanDB) -> ClanDB:
         await cls.collection.insert_one(clan.model_dump())
         return clan

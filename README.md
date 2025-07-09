@@ -19,7 +19,7 @@ uvicorn utils.server.app:app --host 0.0.0.0 --port 8000 --no-access-log
 
 - запустить сервер командой
 ``` sh
-docker-compose up  -f ./docker/docker-compose.yaml -d
+docker-compose -f docker\docker-compose.yaml up -d
 ```
 
 ### Функциональность 

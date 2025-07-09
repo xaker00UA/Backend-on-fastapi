@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 
 from utils.models.response_model import Region
 from utils.service.calculate_time import round_timestamp
-from ...interfase.clan import ClanInterface
+from ...interface.clan import ClanInterface
 from ...models.clan import ClanDB, RestClan, ClanTop
 from ...error import *
 
@@ -48,7 +48,19 @@ async def top_clan_list(
         compute_func=lambda: ClanInterface.get_top_list_clan(
             limit=limit,
             end_day=end_day,
-            start_day=start_day,  # используем исходный timestamp
+            start_day=start_day,
         ),
         **cache_key_params,
+    )
+
+
+@router.get("{region}clan/period")
+async def get_period_clan(
+    region: Region,
+    name: str,
+    end_day: int,
+    start_day: int,
+) -> RestClan:
+    return await ClanInterface(name=name, region=region.value).get_period_clan_session(
+        end_day=end_day, start_day=start_day
     )

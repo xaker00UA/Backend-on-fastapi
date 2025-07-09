@@ -77,6 +77,16 @@ class ClanInterface:
     async def get_clans(self) -> list[ClanDB]:
         return await Clan_sessions.gets(self.name)
 
+    async def get_period_clan_session(self, start_day: int, end_day: int):
+        clan = await self.get_clan_db()
+        old_session = await Clan_all_sessions.get(clan, end_day)
+        if not old_session:
+            raise NotFoundClanDB()
+        new_session = await Clan_all_sessions.get(clan, start_day)
+        if not new_session:
+            raise NotFoundClanDB()
+        return new_session - old_session
+
     @classmethod
     async def get_top_list_clan(cls, end_day, start_day, limit) -> list:
         data = await Clan_all_sessions.get_top(

@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from httpx import get
 
 from utils.models.response_model import AuthLogin, AuthVerify, Region, RestUserDB
-from utils.interfase.player import PlayerSession
+from utils.interface.player import PlayerSession
 from utils.settings.logger import LoggerFactory
 from utils.database.admin import create_access_token, valid
 
@@ -30,6 +30,8 @@ def get_token(token: str | None = Cookie(default=None)) -> str | None:
 
 
 def require_authentication(token: str | None = Cookie(default=None)):
+    if not token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     payload = valid(token)
     return payload.get("player_id")
 
