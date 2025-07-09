@@ -199,7 +199,7 @@ class PlayerSession:
         await self.get_player_DB()
         self.user = await Player_all_sessions.get(self.old_user, end_day)
         if not self.user:
-            raise NotFoundPeriod(self.name)
+            raise NotFoundPeriod(name=self.name)
         self.old_user = await Player_all_sessions.get(self.user, start_day)
         if not self.old_user:
             raise NotFoundPeriod(name=self.name)
