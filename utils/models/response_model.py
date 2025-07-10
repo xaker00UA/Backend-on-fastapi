@@ -225,7 +225,7 @@ class RestClan(BaseModel):
     members_count: int
     members: list[RestMember]
     general: BaseStats = BaseStats()
-    time: int | str | None
+    time: int
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 

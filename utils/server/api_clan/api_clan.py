@@ -54,7 +54,7 @@ async def top_clan_list(
     )
 
 
-@router.get("/{region}clan/period")
+@router.get("/{region}/clan/period")
 async def get_period_clan(
     region: Region,
     name: str,

@@ -1,8 +1,7 @@
-from os import name, path
 import os
 import time
-from datetime import datetime, timedelta
-from prometheus_client import REGISTRY, Counter, Gauge
+from datetime import datetime
+from prometheus_client import REGISTRY
 import re
 from utils.database.Mongo import Clan_sessions, Player_sessions
 from utils.database.admin import get_active_users
