@@ -25,17 +25,18 @@ class Player_sessions(Connect):
 
     @classmethod
     async def get(cls, name, id, region, access_token) -> UserDB:
-        filter = {
-            "$or": [
-                {"player_id": id, "region": region},
-                {
-                    "name": {"$regex": f"^{name}$", "$options": "i"},
-                    "region": region,
-                },
-            ]
-        }
-        if access_token is not None:
-            filter["$or"].append({"access_token": access_token})
+        if name is None and id is None:
+            filter = {"access_token": access_token}
+        else:
+            filter = {
+                "$or": [
+                    {"player_id": id, "region": region},
+                    {
+                        "name": {"$regex": f"^{name}$", "$options": "i"},
+                        "region": region,
+                    },
+                ]
+            }
         res = await cls.collection.find_one(
             filter=filter,
         )
