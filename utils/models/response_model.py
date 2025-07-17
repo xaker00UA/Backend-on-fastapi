@@ -105,7 +105,7 @@ class ItemTank(BaseModel):
         if isinstance(other, ItemTank) and self.tank_id == other.tank_id:
             return self.model_copy(
                 update={
-                    "all": self.all - other.all,
+                    "all": self.all - other.all,  # type: ignore
                 }
             )
 
@@ -196,7 +196,7 @@ class RestUser(RestUserDB):
         if isinstance(other, RestUser):
             return self.model_copy(
                 update={
-                    "tanks": self.tanks - other.tanks,
+                    "tanks": self.tanks - other.tanks,  # type: ignore
                     "general": self.general - other.general,
                     "private": (
                         self.private - other.private

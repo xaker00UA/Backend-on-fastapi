@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware import Middleware
 
 
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from utils.models.response_model import ErrorResponse
 from .auth import router as auth_router
@@ -133,8 +133,8 @@ register_exception_handlers(app)
 
 
 @app.get("/")
-async def root(request: Request) -> str:
-    return "root"
+async def root():
+    return RedirectResponse("/docs")
 
 
 if __name__ == "__main__":

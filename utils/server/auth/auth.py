@@ -49,8 +49,8 @@ async def login(region: Region, redirect_url: str):
 
 
 @router.get("/logout")
-async def logout(player_id: int = Depends(require_authentication)) -> bool:
-    await PlayerSession(id=player_id).logout()
+async def logout(player_id: int = Depends(require_authentication)):
+    # await PlayerSession(id=player_id).logout()
     response = JSONResponse(content=True)
     response.delete_cookie("token")
     return response
@@ -64,6 +64,8 @@ async def auth(
     account_id: int = Query(),
     region: str | None = Depends(get_region),
 ):
+    if not region:
+        raise HTTPException(status_code=400, detail="region not found in cookies")
     player = PlayerSession(
         name=nickname, id=account_id, reg=region, access_token=access_token
     )
@@ -77,7 +79,7 @@ async def auth(
         },
         expires_delta=timedelta(days=7),
     )
-    LoggerFactory.log(message=f"player:{player.user.model_dump()}")
+    LoggerFactory.log(message=f"player:{player.user.model_dump()}")  # type:ignore
     res = JSONResponse(content={"message": "ok"})
     res.delete_cookie("region")
     res.set_cookie(

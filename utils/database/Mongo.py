@@ -246,6 +246,17 @@ class Player_all_sessions(Player_sessions):
         res = await res.to_list(length=limit)
         return res
 
+    @classmethod
+    async def get_period_sessions(cls, player_id, start_day, end_day) -> list[UserDB]:
+        filter = {
+            "$and": [
+                {"player_id": player_id},
+                {"timestamp": {"$gte": start_day, "$lte": end_day}},
+            ]
+        }
+        res = await cls.collection.find(filter=filter).to_list(length=None)
+        return [UserDB.model_validate(doc) for doc in res]
+
 
 class Clan_all_sessions(Clan_sessions):
     collection: AsyncCollection = Connect.db["Clan_all"]

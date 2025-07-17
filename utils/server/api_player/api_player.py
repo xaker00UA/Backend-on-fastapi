@@ -8,6 +8,8 @@ from fastapi import (
     Depends,
 )
 
+from utils.interface.dashboard import DashboardInterface
+from utils.models.dashboard_model import CombatStats
 from utils.server.auth.auth import get_token
 from utils.service.calculate_time import round_timestamp
 
@@ -76,6 +78,13 @@ async def top_players(
             start_day=start_day,  # используем исходный timestamp
         ),
         **cache_key_params,
+    )
+
+
+@router.get("/dashboard_period", response_model=CombatStats)
+async def get_dashboard_period(player_id: int, start_day: int, end_day: int):
+    return await DashboardInterface().get_player_stats_period(
+        player_id, start_day, end_day
     )
 
 
