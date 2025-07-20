@@ -9,7 +9,7 @@ from fastapi.middleware import Middleware
 
 
 from fastapi.responses import JSONResponse, RedirectResponse
-
+from utils.server.client.client_api import client_router
 from utils.models.response_model import ErrorResponse
 from .auth import router as auth_router
 from .api_player import router as player_router, stats as player_stats
@@ -80,6 +80,7 @@ mid = [
 app = FastAPI(
     title="Authentication",
     lifespan=lifespan,
+    root_path="/api/v1",
     servers=[
         {"url": "http://localhost:8000", "description": "Local server API"},
         {"url": "http://testserver.ua/api", "description": "Latest server API"},
@@ -96,6 +97,7 @@ app.include_router(player_router)
 app.include_router(player_stats)
 app.include_router(clan_router)
 app.include_router(admin_router)
+app.include_router(client_router)
 
 
 def create_exception_handler(status_code: int, initial_detail: str) -> Callable:
@@ -105,17 +107,17 @@ def create_exception_handler(status_code: int, initial_detail: str) -> Callable:
             message = exc.message
         else:
             message = initial_detail
-        logger.exception(f"Ошибка {type(exc).__name__}: {exc}")
+        # logger.exception(f"Ошибка {type(exc).__name__}: {exc}")
 
         # Логирование ошибки
         if isinstance(exc, NoUpdateClan) or isinstance(exc, NoUpdatePlayer):
-            LoggerFactory.log(exc, level="CRITICAL")
+            LoggerFactory.log(str(exc), level="CRITICAL")
 
         elif isinstance(exc, BaseCustomException):
-            LoggerFactory.log(exc, level="ERROR")
+            LoggerFactory.log(str(exc), level="ERROR")
 
         else:
-            LoggerFactory.log(exc, level="CRITICAL")
+            LoggerFactory.log(str(exc), level="CRITICAL")
 
         return JSONResponse(status_code=status_code, content={"detail": message})
 

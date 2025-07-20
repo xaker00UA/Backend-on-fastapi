@@ -117,6 +117,14 @@ class NotFoundClanDB(BaseCustomException):
             super().__init__(message="Клан не отслеживается так долго", **kwargs)
 
 
+class NotFoundSessionId(BaseCustomException):
+    def __init__(self, message=None, **kwargs):
+        if message:
+            super().__init__(message=message, **kwargs)
+        else:
+            super().__init__(message="Сессия не найдена", **kwargs)
+
+
 class InvalidAdminToken(BaseCustomException):
     def __init__(self, message=None, **kwargs):
         if message:
@@ -144,6 +152,7 @@ EXCEPTION_HANDLERS = {
     ServerIsTemporarilyUnavailable: (504, "Сервер с данными временно не доступен"),
     RequestError: (400, "Не обработанная ошибка внешнего запроса"),
     ValidError: (422, "Не валидные данные"),
+    NotFoundSessionId: (404, "Сессия не найдена"),
     Exception: (500, "Internal Server Error"),
     # Добавляй сколько нужно
 }

@@ -42,10 +42,10 @@ services:
       - frontend:/app/dist
   nginx:
     container_name: nginx
-    image: nginx:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - frontend:/static/frontend
       - media:/static/media
     ports:
       - "80:80"
@@ -55,5 +55,4 @@ services:
 
 volumes:
   mongo_data:
-  frontend:
   media:

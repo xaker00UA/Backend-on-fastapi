@@ -21,13 +21,14 @@ from ..settings.logger import LoggerFactory
 
 class PlayerSession:
     session = APIServer()
+    player_repo = Player_sessions
 
     def __init__(
         self,
-        name: str = None,
-        id: int = None,
+        name: str | None = None,
+        id: int | None = None,
         reg: str = "eu",
-        access_token: str = None,
+        access_token: str | None = None,
     ):
         if name is None and id is None and access_token is None:
             raise ValueError("Either name or id must be provided")
@@ -40,7 +41,7 @@ class PlayerSession:
             region=reg, name=name, player_id=id, access_token=access_token
         )
         self.old_user: UserDB | None = None
-        self.settings = None
+
         LoggerFactory.log(
             f"Пользователь с параметрами: name={self.name}, id={self.id}, region={self.region}, access_token={access_token}",
             level="DEBUG",
@@ -48,11 +49,11 @@ class PlayerSession:
 
     async def add_player(self):
         await self.get_player_details()
-        await Player_sessions.update(self.user)
+        await self.player_repo.update(self.user)
         return True
 
     async def get_player_DB(self):
-        self.old_user = await Player_sessions.get(
+        self.old_user = await self.player_repo.get(
             self.name, self.id, self.region, self.user.access_token
         )
         if not self.old_user:
@@ -163,13 +164,13 @@ class PlayerSession:
         await self.get_player_DB()
         self.user = self.old_user
         await self.get_player_details()
-        await Player_sessions.add(self.user)
+        await self.player_repo.add(self.user)
+        data = {
+            "player_id": self.user.player_id,
+            "name": self.user.name,
+            "region": self.user.region,
+        }
         if not isAdmin:
-            data = {
-                "player_id": self.user.player_id,
-                "name": self.user.name,
-                "region": self.user.region,
-            }
             add_active_user(**data)
             LoggerFactory.log("User reset stats", extra=data)
         else:
@@ -190,10 +191,10 @@ class PlayerSession:
         await self.get_player_DB()
         await self.session.logout(self.old_user.region, self.old_user.access_token)
         self.old_user.access_token = None
-        await Player_sessions.update(self.old_user)
+        await self.player_repo.update(self.old_user)
 
     async def get_players(self) -> list[UserDB] | list:
-        return await Player_sessions.gets(self.user)
+        return await self.player_repo.gets(self.user)
 
     async def get_period(self, start_day: int, end_day: int) -> RestUser:
         await self.get_player_DB()
@@ -206,8 +207,8 @@ class PlayerSession:
         return await self.results(trigger=False)
 
     @classmethod
-    async def get_token(self, region, redirect_url):
-        return await self.session.get_token(redirect_url=redirect_url, reg=region)
+    async def get_token(cls, region, redirect_url):
+        return await cls.session.get_token(redirect_url=redirect_url, reg=region)
 
     @classmethod
     async def top_players(cls, limit, parameter, start_day):
@@ -230,7 +231,7 @@ class PlayerSession:
     @classmethod
     async def update_db(cls):
         LoggerFactory.log("Start update players DB")
-        async for batch in Player_sessions.find_all():
+        async for batch in self.player_repo.find_all():
             tasks = []
             users = []
 
@@ -246,7 +247,7 @@ class PlayerSession:
             update_users = await gather(*tasks, return_exceptions=True)
             for i in update_users:
                 if isinstance(i, Exception):
-                    print(i.with_traceback())
+
                     print("Traceback:\n", traceback.format_exc())
 
                     LoggerFactory.log(str(i), level="ERROR")
@@ -256,7 +257,7 @@ class PlayerSession:
     @classmethod
     async def update_player_token(cls):
         LoggerFactory.log("Start update player token")
-        async for batch in Player_sessions.find_all():
+        async for batch in cls.player_repo.find_all():
             tasks = []
 
             for user in batch:
@@ -266,6 +267,6 @@ class PlayerSession:
             updated_players = await gather(*tasks)
 
             await gather(
-                *[Player_sessions.update(player) for player in updated_players]
+                *[cls.player_repo.update(player) for player in updated_players]
             )
         LoggerFactory.log("End update player token")

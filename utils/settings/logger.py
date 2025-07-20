@@ -1,10 +1,9 @@
-from asyncio import ensure_future
-from datetime import datetime
 import sys
 import json
 from pathlib import Path
 import traceback
 from typing import Literal
+
 from .config import Config
 from loguru import logger
 
@@ -33,6 +32,8 @@ class LoggerFactory:
             level="INFO",
             format="<green>{time:HH:mm:ss}</green> |<level> {level.icon:^3} </level> | <level>{level:^8}</level> |   <yellow>{message}</yellow>",
             enqueue=True,
+            backtrace=False,
+            diagnose=False,
         )
 
         # INFO лог — хранится 14 дней
@@ -66,6 +67,8 @@ class LoggerFactory:
             rotation="10 MB",
             format=LoggerFactory._critical_formatter,
             enqueue=True,
+            backtrace=True,
+            diagnose=True,
         )
 
         # CRITICAL ошибки + стек (5 строк)
@@ -76,6 +79,8 @@ class LoggerFactory:
             rotation="5 MB",
             serialize=True,  # format=LoggerFactory._critical_formatter,
             enqueue=True,
+            backtrace=True,
+            diagnose=True,
         )
         # API внешний
         logger.add(
@@ -128,7 +133,7 @@ class LoggerFactory:
                     "name": record["name"],
                     "function": record["function"],
                     "line": record["line"],
-                    "short_trace": LoggerFactory.last_stack_lines(limit=5),
+                    "short_trace": record.get("RecordException"),
                     "extra": record.get("extra", {}),
                 },
                 ensure_ascii=False,

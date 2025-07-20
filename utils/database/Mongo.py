@@ -1,14 +1,18 @@
 from typing import AsyncGenerator
+from bson import ObjectId, errors
 from pymongo import AsyncMongoClient
 from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.asynchronous.cursor import AsyncCursor
+
+from utils.error.exception import NotFoundPeriod, NotFoundSessionId
 
 from .helper import get_clan_rating_pipeline
 from utils.settings.logger import LoggerFactory
 from ..models.player import UserDB, Tank
 from ..models.clan import ClanDB
 from utils.settings.config import EnvConfig
+from loguru import logger
 
 
 class Connect:
@@ -18,6 +22,13 @@ class Connect:
     @classmethod
     async def add(cls, data):
         pass
+
+    @classmethod
+    def safe_object_id(cls, session_id: str) -> ObjectId:
+        try:
+            return ObjectId(session_id)
+        except (errors.InvalidId, TypeError) as e:
+            raise NotFoundSessionId(session_id=session_id)
 
 
 class Player_sessions(Connect):
@@ -354,3 +365,27 @@ class Medal_DB(Connect):
         await cls.collection.replace_one(
             filter={"name": medal["name"]}, replacement=medal, upsert=True
         )
+
+
+class Client_DB(Connect):
+    collection: AsyncCollection = Connect.db["Client"]
+
+    @classmethod
+    async def get(cls, session_id: str) -> UserDB | None:
+        _id = cls.safe_object_id(session_id)
+        res = await cls.collection.find_one(filter={"_id": _id})
+        if res:
+            return UserDB.model_validate(res)
+
+    @classmethod
+    async def add(cls, user: UserDB) -> str:
+        result = await cls.collection.insert_one(user.model_dump())
+        return str(result.inserted_id)
+
+    @classmethod
+    async def delete(cls, session_id: str) -> bool:
+        _id = cls.safe_object_id(session_id)
+        result = await cls.collection.delete_one(filter={"_id": _id})
+        if result.deleted_count == 1:
+            return True
+        return False

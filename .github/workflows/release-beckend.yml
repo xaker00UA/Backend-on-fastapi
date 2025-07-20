@@ -1,14 +1,15 @@
-name: Deploy Backend
+name: Deploy Backend Release
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - master
+      - release
     tags:
       - '*'
 
 jobs:
+
   deploy:
     runs-on: ubuntu-latest
 
@@ -25,11 +26,15 @@ jobs:
       - name: Deploy backend to EC2
         run: |
           ssh ec2-user@${{ secrets.EC2_HOST }} << EOF
-            cd app
-            rm -rf backend && mkdir -p backend
+            mkdir services
+            cd services
+            if [ -d backend ]; then
+            rm -rf backend
+            fi
+            mkdir backend
             cd backend
-            git clone -b master https://github.com/${{ github.repository }}.git .
-            docker build -t backend:stable .
-            cd ../
-            docker-compose up  -d --build 
+            git clone -b release https://github.com/${{ github.repository }}.git .
+            cd docker/
+            docker-compose up -d --build 
           EOF
+
