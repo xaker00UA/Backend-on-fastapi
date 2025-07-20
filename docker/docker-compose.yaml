@@ -32,14 +32,6 @@ services:
      - "./logs:/app/logs"
      - 'media:/app/media'
     mem_limit: 500mb
-  frontend:
-    build:
-      context: ../
-      dockerfile: docker/Dockerfile.frontend
-    container_name: frontend
-    working_dir: /app
-    volumes:
-      - frontend:/app/dist
   nginx:
     container_name: nginx
     build:
