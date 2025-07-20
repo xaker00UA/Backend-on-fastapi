@@ -34,6 +34,7 @@ jobs:
             mkdir backend
             cd backend
             git clone -b master https://github.com/${{ github.repository }}.git .
+            cp ../env_files/.env.backend ./env
             cd docker/
             docker-compose up -d --build 
           EOF
