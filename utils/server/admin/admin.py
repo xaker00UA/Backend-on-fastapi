@@ -12,9 +12,9 @@ from fastapi import (
 from fastapi.requests import Request
 
 from utils.interface.admin import AdminInterface, MetricsInterface
-from utils.models.response_model import Command, ItemTank, LoginForm
+from utils.models.response_model import ItemTank, LoginForm
 from prometheus_client import generate_latest
-from utils.server.admin.schemas import AdminStats, CreateTank
+from utils.server.admin.schemas import AdminStats, CommandRequest, CreateTank
 from utils.settings.logger import LoggerFactory
 from ...database.admin import get_user, verify_password, create_access_token, valid
 from fastapi import UploadFile
@@ -52,9 +52,10 @@ def logout(response: Response):
     return {"message": "Logged out"}
 
 
-@router.post("/commands")
-async def protected_route(commands: Command, current_user=Depends(is_admin_valid)):
-
+@router.post("/commands", status_code=202, dependencies=[Depends(is_admin_valid)])
+async def protected_route(
+    commands: CommandRequest, current_user=Depends(is_admin_valid)
+):
     await commands.run()
     return {"command": "success"}
 

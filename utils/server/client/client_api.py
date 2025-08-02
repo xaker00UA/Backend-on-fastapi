@@ -6,6 +6,7 @@ from utils.interface.client import ClientInterface
 from utils.models.response_model import Region, RestUser
 from utils.server.client.schemas import CreateResponse
 from utils.database.admin import valid
+from loguru import logger as log
 
 client_router = APIRouter(prefix="/client", tags=["client"])
 
@@ -15,6 +16,7 @@ api_key_scheme = APIKeyHeader(name="X-Token", auto_error=True)
 
 def get_permissions(token: str = Depends(api_key_scheme)):
     valid(token)
+    log.bind(name="root").info(f"Клиент {token.get("name")}")
     return token
 
 

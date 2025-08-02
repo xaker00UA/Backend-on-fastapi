@@ -1,6 +1,7 @@
 from asyncio import gather
+from datetime import datetime, timedelta
 from itertools import zip_longest
-import traceback
+
 
 from pydantic import BaseModel
 
@@ -112,7 +113,7 @@ class PlayerSession:
         model = user.result()
         return model
 
-    async def results(self, trigger: bool = True) -> RestPlayer:
+    async def results(self, trigger: bool = True) -> RestUser:
         session = await self._results(trigger=trigger)
         now = await self._now_stats()
         update = await self._update_stats()
@@ -198,7 +199,10 @@ class PlayerSession:
 
     async def get_period(self, start_day: int, end_day: int) -> RestUser:
         await self.get_player_DB()
-        self.user = await Player_all_sessions.get(self.old_user, end_day)
+        if datetime.now().timestamp() - end_day < timedelta(days=1).total_seconds():
+            await self.get_player_details()
+        else:
+            self.user = await Player_all_sessions.get(self.old_user, end_day)
         if not self.user:
             raise NotFoundPeriod(name=self.name)
         self.old_user = await Player_all_sessions.get(self.user, start_day)
@@ -229,12 +233,13 @@ class PlayerSession:
         ]
 
     @classmethod
-    async def update_db(cls):
-        LoggerFactory.log("Start update players DB")
-        async for batch in self.player_repo.find_all():
-            tasks = []
-            users = []
-
+    async def update_player_db(cls, _all=True):
+        if _all:
+            LoggerFactory.log("Start update player all db")
+            LoggerFactory.log("Start update player db")
+        else:
+            LoggerFactory.log("Start update player all db")
+        async for batch in cls.player_repo.find_all():
             for user in batch:
                 user = cls(
                     name=user.name,
@@ -242,17 +247,18 @@ class PlayerSession:
                     id=user.player_id,
                     access_token=user.access_token,
                 )
-                tasks.append(user.get_player_details(rating=False))
-                users.append(user)
-            update_users = await gather(*tasks, return_exceptions=True)
-            for i in update_users:
-                if isinstance(i, Exception):
-
-                    print("Traceback:\n", traceback.format_exc())
-
-                    LoggerFactory.log(str(i), level="ERROR")
-            await Player_all_sessions.add([user.user for user in users])
-        LoggerFactory.log("End update players DB")
+                try:
+                    await user.get_player_details()
+                    if _all:
+                        await Player_sessions.add(user.user)
+                    await Player_all_sessions.add([user.user])
+                except Exception as e:
+                    LoggerFactory.log(str(e), level="CRITICAL")
+        if _all:
+            LoggerFactory.log("End update player all db")
+            LoggerFactory.log("End update player db")
+        else:
+            LoggerFactory.log("End update player all db")
 
     @classmethod
     async def update_player_token(cls):

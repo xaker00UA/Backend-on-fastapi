@@ -27,9 +27,6 @@ from ..settings.logger import LoggerFactory
 from ..api.wotb import APIServer
 
 
-from loguru import logger
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
@@ -41,10 +38,22 @@ async def lifespan(app: FastAPI):
     trigger = CronTrigger(hour=12, minute=10, second=00)
     trigger_clan = CronTrigger(day_of_week="mon", hour=12, minute=10)
     scheduler.add_job(
-        PlayerSession.update_db, trigger=trigger, misfire_grace_time=3600 * 6
+        PlayerSession.update_player_db,
+        args=[False],
+        trigger=trigger,
+        misfire_grace_time=3600 * 6,
     )
     scheduler.add_job(
-        ClanInterface.update_db, trigger=trigger_clan, misfire_grace_time=3600 * 6
+        ClanInterface.update_clan_db,
+        args=[False],
+        trigger=trigger,
+        misfire_grace_time=3600 * 6,
+    )
+    scheduler.add_job(
+        ClanInterface.update_clan_db,
+        args=[True],
+        trigger=trigger_clan,
+        misfire_grace_time=3600 * 6,
     )
     scheduler.add_job(
         PlayerSession.update_player_token,

@@ -95,15 +95,22 @@ class ClanInterface:
         return [ClanTop.model_validate(i) for i in data]
 
     @classmethod
-    async def update_db(cls):
-        LoggerFactory.log("Start update clan db")
+    async def update_clan_db(cls, _all: bool = True):
+        if _all:
+            LoggerFactory.log("Start update clan all db")
+            LoggerFactory.log("Start update clan db")
+        else:
+            LoggerFactory.log("Start update clan all db")
         async for batch in Clan_sessions.find_all():
             for clan in batch:
                 clan = await cls(
                     name=clan.name, region=clan.region, clan_id=clan.clan_id
                 ).get_clan_details()
-                await gather(
-                    *[Clan_all_sessions.add(clan), Clan_sessions.add(clan)],
-                    return_exceptions=True,
-                )
-        LoggerFactory.log("End update clan db")
+                if _all:
+                    await Clan_sessions.add(clan)
+                await Clan_all_sessions.add(clan)
+        if _all:
+            LoggerFactory.log("End update clan all db")
+            LoggerFactory.log("End update clan db")
+        else:
+            LoggerFactory.log("End update clan all db")

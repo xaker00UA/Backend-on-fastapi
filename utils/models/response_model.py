@@ -245,57 +245,6 @@ class LoginForm(BaseModel):
     password: str
 
 
-class Commands(Enum):
-    reset = "!reset_user"
-    reset_clan = "!reset_clan"
-    delete = "!delete_user"
-    delete_clan = "!delete_clan"
-    update_player_db = "!update_player_db"
-    update_clan_db = "!update_clan_db"
-
-
-class Command(BaseModel):
-    command: Commands
-    region: Region | None = None
-    arguments: str = ""
-
-    _task: Callable | None = PrivateAttr(default=None)
-
-    async def run(self):
-        if self._task:
-            return await self._task
-
-    @model_validator(mode="after")
-    def convector(self):
-        self.region = (
-            self.region.value if isinstance(self.region, Region) else self.region
-        )
-        return self
-
-    @model_validator(mode="after")
-    def valid(self):
-        from utils.interface.clan import ClanInterface
-        from utils.interface.player import PlayerSession
-
-        if self.command == Commands.reset:
-            self._task = PlayerSession(name=self.arguments, reg=self.region).reset()
-        elif self.command == Commands.reset_clan:
-            self._task = ClanInterface(region=self.region, tag=self.arguments).reset()
-        elif self.command == Commands.update_player_db:
-            self._task = PlayerSession.update_db()
-        elif self.command == Commands.update_clan_db:
-            self._task = ClanInterface.update_db()
-        elif self.command == Commands.delete:
-            # Замените на нужное действие
-            self._task = ...
-        elif self.command == Commands.delete_clan:
-            # Замените на нужное действие
-            self._task = ...
-        else:
-            raise TypeError("Invalid command")
-        return self
-
-
 class AuthLogin(BaseModel):
     success: str = "ok"
     url: str
