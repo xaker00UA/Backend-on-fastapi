@@ -20,6 +20,7 @@ dependencies = [
     "prometheus-client (>=0.22.0,<0.23.0)",
     "loguru (>=0.7.3,<0.8.0)",
     "python-multipart (>=0.0.20,<0.0.21)",
+    "faststream[cli] (>=0.5.48,<0.6.0)",
 ]
 
 [build-system]

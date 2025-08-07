@@ -1,8 +1,6 @@
-from math import e
 import time
-import traceback
+
 from typing import Callable
-import warnings
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware import Middleware
@@ -116,7 +114,6 @@ def create_exception_handler(status_code: int, initial_detail: str) -> Callable:
             message = exc.message
         else:
             message = initial_detail
-        # logger.exception(f"Ошибка {type(exc).__name__}: {exc}")
 
         # Логирование ошибки
         if isinstance(exc, NoUpdateClan) or isinstance(exc, NoUpdatePlayer):

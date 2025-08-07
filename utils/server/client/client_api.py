@@ -15,8 +15,8 @@ api_key_scheme = APIKeyHeader(name="X-Token", auto_error=True)
 
 
 def get_permissions(token: str = Depends(api_key_scheme)):
-    valid(token)
-    log.bind(name="root").info(f"Клиент {token.get("name")}")
+    data = valid(token)
+    log.bind(name="root").info(f"Клиент {data.get("name")}")
     return token
 
 
