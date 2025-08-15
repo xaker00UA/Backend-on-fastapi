@@ -1,3 +1,4 @@
+from utils.interface.task import Task
 from typing import Annotated
 from fastapi import (
     APIRouter,
@@ -11,6 +12,7 @@ from fastapi import (
 )
 from fastapi.requests import Request
 
+from utils.cache.redis_cache import redis_cache
 from utils.interface.admin import AdminInterface, MetricsInterface
 from utils.models.response_model import ItemTank, LoginForm
 from prometheus_client import generate_latest
@@ -52,12 +54,16 @@ def logout(response: Response):
     return {"message": "Logged out"}
 
 
-@router.post("/commands", status_code=202, dependencies=[Depends(is_admin_valid)])
+@router.post(
+    "/commands",
+    status_code=202,
+    response_model=Task,
+    dependencies=[Depends(is_admin_valid)],
+)
 async def protected_route(
     commands: CommandRequest, current_user=Depends(is_admin_valid)
 ):
-    await commands.run()
-    return {"command": "success"}
+    return await commands.run()
 
 
 @router.get("/verify")
@@ -71,6 +77,14 @@ async def info(
 ):
     service = MetricsInterface(requests.app.state.time)
     return await service.collect_all(limit=limit)
+
+
+@router.get("/task/{task_id}")
+async def get_task(task_id: str, current_user=Depends(is_admin_valid)):
+    task_text = await redis_cache.get(task_id)
+    if task_text is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return Task.model_validate(task_text)
 
 
 @router.post(

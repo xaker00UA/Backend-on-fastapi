@@ -42,7 +42,7 @@ class RedisCache:
         key = self.make_key(namespace, **params)
         cached = await self.get(key)
         if cached:
-            logger.info("Взято из кеша функция {compute_func.__name__}")
+            logger.bind(name="root").info(f"Взято из кеша функция {key}")
             return cached
         model = await compute_func()
         if isinstance(model, list):

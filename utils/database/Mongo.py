@@ -150,7 +150,6 @@ class Clan_sessions(Connect):
     async def find_all(cls) -> AsyncGenerator[list, None]:
         batch_size = 100
         cursor: AsyncCursor = cls.collection.find(batch_size=batch_size)
-
         while True:
             batch = await cursor.to_list(length=batch_size)
             if not batch:

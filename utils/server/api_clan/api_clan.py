@@ -43,7 +43,7 @@ async def top_clan_list(
     }
 
     return await redis_cache.cache_or_compute(
-        namespace="top_players",
+        namespace="top_clans",
         expire=6 * 3600,
         compute_func=lambda: ClanInterface.get_top_list_clan(
             limit=limit,

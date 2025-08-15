@@ -98,6 +98,7 @@ app = FastAPI(
         code: {"model": ErrorResponse, "description": msg}
         for _, (code, msg) in EXCEPTION_HANDLERS.items()
     },
+    openapi_url="/openapi.json",
 )
 app.include_router(auth_router)
 app.include_router(player_router)
