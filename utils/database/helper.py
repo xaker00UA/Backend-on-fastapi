@@ -173,9 +173,9 @@ def get_clan_rating_pipeline(start_day, end_day):
             "$addFields": {
                 "rating": {
                     "$sum": [
-                        {"$multiply": ["$x_d", 0.5]},
+                        {"$multiply": ["$x_d", 0.4]},
                         {"$multiply": ["$x_w", 0.3]},
-                        {"$multiply": ["$x_b", 0.2]},
+                        {"$multiply": ["$x_b", 0.3]},
                     ]
                 }
             }

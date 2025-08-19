@@ -36,7 +36,7 @@ class DashboardInterface:
         )
         filter_items = self.group_by_day_oldest(items)
         result_items = []
-        for index in range(0, len(filter_items) - 1, 2):
+        for index in range(0, len(filter_items) - 1, 1):
             diff = (filter_items[index + 1] - filter_items[index]).result()
             if getattr(diff.general.session, "all", None) is not None:
                 result_items.append(
