@@ -4,7 +4,7 @@ from fastapi.security import APIKeyHeader
 from utils.interface import admin
 from utils.interface.client import ClientInterface
 from utils.models.response_model import Region, RestUser
-from utils.server.client.schemas import CreateResponse
+from utils.server.client.schemas import CreateResponse, SessionResetRequest
 from utils.database.admin import valid
 from loguru import logger as log
 
@@ -53,7 +53,7 @@ async def delete_session(session_id: str):
     dependencies=[Depends(get_permissions)],
     response_model=CreateResponse,
 )
-async def reset_session(session_id: str = Body(...)):
-    service = ClientInterface(session_id=session_id, name="_")
+async def reset_session(data: SessionResetRequest):
+    service = ClientInterface(session_id=data.session_id, name="_")
     session_id = await service.reset()
     return CreateResponse(session_id=session_id, **service.user.model_dump())  # type: ignore
