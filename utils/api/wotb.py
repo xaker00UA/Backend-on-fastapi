@@ -1,4 +1,3 @@
-import json
 from aiohttp import ClientSession, ClientResponse
 from asynciolimiter import Limiter
 from prometheus_client import Counter
@@ -158,7 +157,6 @@ class APIServer(Singleton):
             if not player:
                 player_id = await self.get_id(reg, name)
             else:
-                # player = json.loads(player)
                 player = UserDB(
                     player_id=player.get("player_id"),
                     region=player.get("region"),

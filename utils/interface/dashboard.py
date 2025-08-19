@@ -36,14 +36,16 @@ class DashboardInterface:
         )
         filter_items = self.group_by_day_oldest(items)
         result_items = []
-        for index in range(0, len(filter_items), 2):
-            result_items.append(
-                {
-                    "timestamp": filter_items[index].timestamp,
-                    "value": filter_items[index + 1] - filter_items[index],
-                }
-            )
-        res: list[RestUser] = [item.get("value").result() for item in result_items]
+        for index in range(0, len(filter_items) - 1, 2):
+            diff = (filter_items[index + 1] - filter_items[index]).result()
+            if getattr(diff.general.session, "all", None) is not None:
+                result_items.append(
+                    {
+                        "timestamp": filter_items[index].timestamp,
+                        "value": diff,
+                    }
+                )
+        res: list[RestUser] = [item.get("value") for item in result_items]
         return {
             "timestamp": [i.get("timestamp") for i in result_items],
             "survival": [i.general.session.all.survival for i in res],
