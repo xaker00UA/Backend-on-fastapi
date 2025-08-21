@@ -9,14 +9,13 @@ from sqlalchemy import (
     select,
     cast,
 )
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from passlib.context import CryptContext
-from sqlalchemy.orm import sessionmaker
 
 from utils.settings.logger import LoggerFactory
 from ..settings.config import EnvConfig
 from jose import JWTError, jwt, ExpiredSignatureError
-from fastapi import HTTPException, Cookie, status
+from fastapi import HTTPException, status
 from ..error.exception import *
 
 # Конфигурация
@@ -35,7 +34,10 @@ engine = create_engine(
 
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 def get_db():
@@ -63,10 +65,8 @@ class ActiveUser(Base):
     data = Column(DATE, default=datetime.now())
 
 
-Base.metadata.create_all(bind=engine)
-
-
 def initialize_db():
+    Base.metadata.create_all(bind=engine)
     with SessionLocal() as session:
         try:
             user = SuperUser(

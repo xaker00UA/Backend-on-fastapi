@@ -8,6 +8,7 @@ from fastapi.middleware import Middleware
 
 from fastapi.responses import JSONResponse, RedirectResponse
 from utils.server.client.client_api import client_router
+from utils.server.api_post.api_post import post_router
 from utils.models.response_model import ErrorResponse
 from .auth import router as auth_router
 from .api_player import router as player_router, stats as player_stats
@@ -106,6 +107,7 @@ app.include_router(player_stats)
 app.include_router(clan_router)
 app.include_router(admin_router)
 app.include_router(client_router)
+app.include_router(post_router)
 
 
 def create_exception_handler(status_code: int, initial_detail: str) -> Callable:
