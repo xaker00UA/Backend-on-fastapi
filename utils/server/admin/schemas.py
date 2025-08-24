@@ -88,3 +88,7 @@ class CommandRequest(BaseModel):
         if self._task:
             return await self._task()
         AttributeError("Command not found")
+
+
+class RequestMessage(BaseModel):
+    message: str

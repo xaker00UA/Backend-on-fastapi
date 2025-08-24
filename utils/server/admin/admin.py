@@ -16,13 +16,22 @@ from utils.cache.redis_cache import redis_cache
 from utils.interface.admin import AdminInterface, MetricsInterface
 from utils.models.response_model import ItemTank, LoginForm
 from prometheus_client import generate_latest
-from utils.server.admin.schemas import AdminStats, CommandRequest, CreateTank
+from utils.server.admin.schemas import (
+    AdminStats,
+    CommandRequest,
+    CreateTank,
+    RequestMessage,
+)
+from utils.settings.config import EnvConfig
 from utils.settings.logger import LoggerFactory
 from ...database.admin import get_user, verify_password, create_access_token, valid
 from fastapi import UploadFile
+from faststream.redis.fastapi import RedisBroker, RedisRouter
+from loguru import logger as log
 
 # FastAPI приложение
 router = APIRouter(prefix="/admin", tags=["admin"])
+broker = RedisRouter(EnvConfig.REDIS, db=3)
 
 
 def is_admin_valid(admin_token: str = Cookie("admin_token")):
@@ -113,3 +122,12 @@ async def add_tank(
     return await service.add_tank(
         tank_data=tank, image_big=image_big, image_small=image_small
     )
+
+
+@broker.post("/message", dependencies=[Depends(is_admin_valid)])
+async def send_message(message: RequestMessage):
+    await broker.broker.publish(message=message.message, stream="notification")
+    log.info("Send message users")
+
+
+router.include_router(broker)
