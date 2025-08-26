@@ -1,5 +1,11 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, field_serializer, model_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    field_serializer,
+    field_validator,
+    model_serializer,
+)
 
 
 class RequestPost(BaseModel):
@@ -9,6 +15,12 @@ class RequestPost(BaseModel):
     @field_serializer("version", when_used="json")
     def prefix_version(self, version):
         return f"v{version}"
+
+    @field_validator("version")
+    def validate_version(cls, version):
+        if not version or not version.strip():
+            raise ValueError("Поле 'version' не должно быть пустым")
+        return version
 
     @model_serializer(mode="wrap")
     def reorder_fields(self, serializer, info):
