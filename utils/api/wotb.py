@@ -343,13 +343,16 @@ class APIServer(Singleton):
             .replace("<app_id>", self._get_id_by_reg(reg))
             .replace("<name>", name)
         )
-        data = await self.fetch(url)
+        try:
+            data = await self.fetch(url)
+        except PlayerNotFound:
+            raise ClanNotFound(name=name)
         for item in data["data"]:
             if item["name"] == name:
                 return Clan(**item)
             if item["tag"] == name.upper():
                 return Clan(**item)
-        raise ClanNotFound(name)
+        raise ClanNotFound(name=name)
 
     async def get_clan_details(
         self,

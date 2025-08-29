@@ -53,7 +53,12 @@ async def login(
         )
 
     access_token = create_access_token(data={"sub": user.username})
-    response.set_cookie(key="admin_token", value=access_token, httponly=True)
+    response.set_cookie(
+        key="admin_token",
+        expires=EnvConfig.ACCESS_TOKEN_EXPIRE_MINUTES,
+        value=access_token,
+        httponly=True,
+    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 

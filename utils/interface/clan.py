@@ -1,4 +1,5 @@
 from asyncio import gather
+from datetime import datetime
 
 from utils.settings.logger import LoggerFactory
 from ..models.clan import Clan, ClanDB, ClanDetails, ClanTop, RestClan
@@ -82,7 +83,10 @@ class ClanInterface:
         old_session = await Clan_all_sessions.get(clan, end_day)
         if not old_session:
             raise NotFoundClanDB()
-        new_session = await Clan_all_sessions.get(clan, start_day)
+        if datetime.now().timestamp() - start_day < 86400:
+            new_session = await self.get_clan_details()
+        else:
+            new_session = await Clan_all_sessions.get(clan, start_day)
         if not new_session:
             raise NotFoundClanDB()
         return new_session - old_session
