@@ -67,7 +67,9 @@ class ClanInterface:
         res = await Clan_sessions.get(self.name, self.clan_id, self.region)
         if not res:
             await self.add_clan_db()
-            raise NotFoundClanDB(self.name if self.name else self.tag)
+            raise NotFoundClanDB(
+                f"Клан {self.name if self.name else self.tag} только начал отслеживаться"
+            )
         return res
 
     async def add_clan_db(self) -> ClanDB:

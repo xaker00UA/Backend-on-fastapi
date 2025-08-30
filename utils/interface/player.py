@@ -238,34 +238,36 @@ class PlayerSession:
             LoggerFactory.log("Start update player all db")
             LoggerFactory.log("Start update player db")
         else:
-            LoggerFactory.log("Start update player all db")
+            LoggerFactory.log("Start update player db")
         async for batch in cls.player_repo.find_all():
             for user in batch:
-                user = cls(
+                interface = cls(
                     name=user.name,
                     reg=user.region,
                     id=user.player_id,
                     access_token=user.access_token,
                 )
                 try:
-                    await user.get_player_details()
+                    await interface.get_player_details()
+                    if interface.user.name != user.name:
+                        await Player_all_sessions.update(interface.user)
+                        await Player_sessions.update(interface.user)
                     if _all:
-                        await Player_sessions.add(user.user)
-                    await Player_all_sessions.add([user.user])
+                        await Player_sessions.add(interface.user)
+                    await Player_all_sessions.add([interface.user])
                 except Exception as e:
                     LoggerFactory.log(str(e), level="CRITICAL")
         if _all:
             LoggerFactory.log("End update player all db")
             LoggerFactory.log("End update player db")
         else:
-            LoggerFactory.log("End update player all db")
+            LoggerFactory.log("End update player db")
 
     @classmethod
     async def update_player_token(cls):
         LoggerFactory.log("Start update player token")
         async for batch in cls.player_repo.find_all():
             tasks = []
-
             for user in batch:
                 if user.access_token is None:
                     continue

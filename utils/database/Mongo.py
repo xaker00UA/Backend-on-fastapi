@@ -69,9 +69,9 @@ class Player_sessions(Connect):
     async def update(cls, user: UserDB) -> UserDB:
         existing_document = await cls.collection.find_one({"player_id": user.player_id})
         if existing_document:
-            await cls.collection.update_one(
+            await cls.collection.update_many(
                 {"player_id": user.player_id},
-                {"$set": {"access_token": user.access_token}},
+                {"$set": {"access_token": user.access_token, "name": user.name}},
             )
         else:
             await cls.add(user)
@@ -155,6 +155,18 @@ class Clan_sessions(Connect):
             if not batch:
                 break
             yield [ClanDB.model_validate(doc) for doc in batch]
+
+    @classmethod
+    async def update(cls, clan: ClanDB):
+        existing_document = await cls.collection.find_one({"clan_id": clan.clan_id})
+        if existing_document:
+            await cls.collection.update_many(
+                {"clan_id": clan.clan_id},
+                {"$set": {"name": clan.name, "tag": clan.tag}},
+            )
+        else:
+            await cls.add(clan)
+        return clan
 
 
 class Player_all_sessions(Player_sessions):

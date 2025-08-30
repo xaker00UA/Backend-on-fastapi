@@ -83,9 +83,12 @@ class TaskInterface:
             logger.info("Start update clan all db")
         async for batch in Clan_sessions.find_all():
             for clan in batch:
-                clan = await self.clan_interface(
+                interface = await self.clan_interface(
                     name=clan.name, region=clan.region, clan_id=clan.clan_id
                 ).get_clan_details()
+                if interface.name != clan.name or interface.tag != clan.tag:
+                    await Clan_all_sessions.update(interface)
+                    await Clan_sessions.update(interface)
                 if _all:
                     await Clan_sessions.add(clan)
                 await Clan_all_sessions.add(clan)
@@ -111,17 +114,20 @@ class TaskInterface:
 
         async def process_user(user_data):
             async with semaphore:
-                user = self.player_interface(
+                interface = self.player_interface(
                     name=user_data.name,
                     reg=user_data.region,
                     id=user_data.player_id,
                     access_token=user_data.access_token,
                 )
                 try:
-                    await user.get_player_details()
+                    await interface.get_player_details()
+                    if interface.user != user_data.name:
+                        await Player_all_sessions.update(interface.user)
+                        await Player_sessions.update(interface.user)
                     if _all:
-                        await Player_sessions.add(user.user)
-                    await Player_all_sessions.add([user.user])
+                        await Player_sessions.add(interface.user)
+                    await Player_all_sessions.add([interface.user])
 
                     task = await self.get_task(_id)
                     task.add_done_task()
